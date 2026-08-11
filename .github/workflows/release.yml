@@ -1,0 +1,113 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact immutable v0 SemVer tag
+        required: true
+        type: string
+      stable_confirmation:
+        description: Enter publish-stable for a non-prerelease tag
+        required: false
+        type: string
+
+concurrency:
+  group: lotor-go-release
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  release:
+    name: Verify, tag, and publish module
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: sdk-release
+    permissions:
+      contents: write
+    steps:
+      - name: Check out dispatched commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: 1.24.x
+          cache: true
+
+      - name: Validate immutable release inputs
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          STABLE_CONFIRMATION: ${{ inputs.stable_confirmation }}
+        run: |
+          set -eu
+          case "$RELEASE_VERSION" in
+            v0.*.*-rc.*) ;;
+            v0.*.*) test "$STABLE_CONFIRMATION" = "publish-stable" ;;
+            *) echo "version must be an exact v0 SemVer or release candidate" >&2; exit 1 ;;
+          esac
+          printf '%s\n' "$RELEASE_VERSION" | grep -Eq '^v0\.[0-9]+\.[0-9]+(-rc\.[1-9][0-9]*)?$'
+          test -f LICENSE
+          test "$(go list -m)" = "github.com/2kims/lotor-go"
+          if git rev-parse "$RELEASE_VERSION^{commit}" >/dev/null 2>&1; then
+            echo "$RELEASE_VERSION already exists" >&2
+            exit 1
+          fi
+
+      - name: Verify module and clean consumer
+        run: |
+          test -z "$(gofmt -l .)"
+          go mod tidy
+          git diff --exit-code
+          go test ./...
+          go vet ./...
+          go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8 run ./...
+          go doc github.com/2kims/lotor-go/lotor >/dev/null
+          go doc github.com/2kims/lotor-go/lotorhttp >/dev/null
+          ./scripts/check-consumer.sh local
+
+      - name: Create immutable annotated tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          tag_object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+            -f tag="$RELEASE_VERSION" \
+            -f message="Lotor Go SDK $RELEASE_VERSION" \
+            -f object="$GITHUB_SHA" \
+            -f type=commit \
+            --jq .sha)"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$RELEASE_VERSION" \
+            -f sha="$tag_object" >/dev/null
+
+      - name: Verify public Go proxy and external consumer
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          GOPROXY: https://proxy.golang.org
+        run: |
+          set -eu
+          for attempt in 1 2 3 4 5; do
+            if go list -m "github.com/2kims/lotor-go@$RELEASE_VERSION"; then
+              break
+            fi
+            test "$attempt" -lt 5
+            sleep $((attempt * 10))
+          done
+          ./scripts/check-consumer.sh "$RELEASE_VERSION"
+
+      - name: Create matching GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          case "$RELEASE_VERSION" in
+            *-*) gh release create "$RELEASE_VERSION" --verify-tag --prerelease --title "$RELEASE_VERSION" --generate-notes ;;
+            *) gh release create "$RELEASE_VERSION" --verify-tag --title "$RELEASE_VERSION" --generate-notes ;;
+          esac
