@@ -4,6 +4,13 @@ All notable public API and compatibility changes are documented here. This
 project follows Semantic Versioning; breaking changes during `v0.x` releases
 are called out explicitly.
 
+## v0.1.0-rc.2
+
+- Add client-owned subject key enrollment and encrypted resource key-envelope
+  lifecycle operations.
+- Add encrypted invitations whose resource grants remain pending until a
+  signed recipient envelope activates access.
+
 ## v0.1.0-rc.1
 
 - Add the `github.com/2kims/lotor-go` module.

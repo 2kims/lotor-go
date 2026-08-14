@@ -25,35 +25,46 @@ const (
 )
 
 const (
-	opHELLO          = 0x0001
-	opAUTH           = 0x0002
-	opPING           = 0x0003
-	opQUIT           = 0x0004
-	opAUTHVERIFY     = 0x0010
-	opACCESSCHECK    = 0x0020
-	opACCESSGRANT    = 0x0021
-	opACCESSREVOKE   = 0x0022
-	opACCESSEXPAND   = 0x0023
-	opMETERCONSUME   = 0x0030
-	opMETERRELEASE   = 0x0031
-	opMETERGET       = 0x0032
-	opSEATCLAIM      = 0x0040
-	opSEATRELEASE    = 0x0041
-	opCONFGET        = 0x0050
-	opWALLETCREDIT   = 0x0070
-	opWALLETDEBIT    = 0x0071
-	opWALLETGET      = 0x0072
-	opALLOWANCEGRANT = 0x0073
-	opALLOWANCEGET   = 0x0074
-	opPOLICYCHECK    = 0x0080
-	opINVITECREATE   = 0x0090
-	opINVITEACCEPT   = 0x0091
-	opINVITECANCEL   = 0x0092
-	opINVITELIST     = 0x0093
-	opMEMBERREMOVE   = 0x0094
-	opMEMBERROLESET  = 0x0095
-	opWATCH          = 0x0060
-	opUNWATCH        = 0x0061
+	opHELLO                  = 0x0001
+	opAUTH                   = 0x0002
+	opPING                   = 0x0003
+	opQUIT                   = 0x0004
+	opAUTHVERIFY             = 0x0010
+	opACCESSCHECK            = 0x0020
+	opACCESSGRANT            = 0x0021
+	opACCESSREVOKE           = 0x0022
+	opACCESSEXPAND           = 0x0023
+	opMETERCONSUME           = 0x0030
+	opMETERRELEASE           = 0x0031
+	opMETERGET               = 0x0032
+	opSEATCLAIM              = 0x0040
+	opSEATRELEASE            = 0x0041
+	opCONFGET                = 0x0050
+	opWALLETCREDIT           = 0x0070
+	opWALLETDEBIT            = 0x0071
+	opWALLETGET              = 0x0072
+	opALLOWANCEGRANT         = 0x0073
+	opALLOWANCEGET           = 0x0074
+	opPOLICYCHECK            = 0x0080
+	opINVITECREATE           = 0x0090
+	opINVITEACCEPT           = 0x0091
+	opINVITECANCEL           = 0x0092
+	opINVITELIST             = 0x0093
+	opMEMBERREMOVE           = 0x0094
+	opMEMBERROLESET          = 0x0095
+	opSUBJECTKEYREGISTER     = 0x00A0
+	opSUBJECTKEYLIST         = 0x00A1
+	opSUBJECTKEYREVOKE       = 0x00A2
+	opRESOURCEKEYCREATE      = 0x00A3
+	opRESOURCEGRANTPREPARE   = 0x00A4
+	opRESOURCEENVELOPESUBMIT = 0x00A5
+	opRESOURCEENVELOPEGET    = 0x00A6
+	opRESOURCEMEMBERLIST     = 0x00A7
+	opRESOURCEGRANTREVOKE    = 0x00A8
+	opENCRYPTEDINVITECREATE  = 0x00A9
+	opENCRYPTEDINVITEACCEPT  = 0x00AA
+	opWATCH                  = 0x0060
+	opUNWATCH                = 0x0061
 )
 
 const (
@@ -86,6 +97,7 @@ func vU64(n uint64) value        { return value{Kind: tagU64, U64: n} }
 func vStr(s string) value        { return value{Kind: tagStr, Str: s} }
 func vAddr(s string) value       { return value{Kind: tagAddr, Str: s} }
 func vBool(enabled bool) value   { return value{Kind: tagBool, Bool: enabled} }
+func vBytes(bytes []byte) value  { return value{Kind: tagBytes, Bytes: bytes} }
 func vList(values []value) value { return value{Kind: tagList, List: values} }
 func vNull() value               { return value{Kind: tagNull} }
 func vMap(values map[string]value) value {
