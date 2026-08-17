@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "35ca9d53c485a923801002d3b540e38595e695c4",
+  "source_commit": "348f99e98e886fe0157b7e9ecfb45eec5a2ec1f4",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -13,7 +13,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c60c5a1582add0d9aedeea6af072243df59ab8edc4de15a136e65b545d53488f"
+      "sha256": "da77973f7f46d15264254f220d4a819f4822de93bb488d8113fa1ae778646170"
     },
     {
       "path": "examples/basic/main.go",
@@ -33,7 +33,15 @@
     },
     {
       "path": "lotor/client.go",
-      "sha256": "e49339902602373a63d1510d4032422864da02ddbd7416dfddaab1e51ef821f2"
+      "sha256": "af62cb0fbbe6f11895f8380f4cc65a8c6bcfb7da190367c8efc6eb6fabc5825f"
+    },
+    {
+      "path": "lotor/key_access_test.go",
+      "sha256": "3d3269b8ea1a11ae80c3e1e7e7e281b776a41463effc673c969b67f288748589"
+    },
+    {
+      "path": "lotor/key_access.go",
+      "sha256": "b4a7ecc26e77d86c91753249d47714855df8ca9fdf87b0fd27ef0c738941ea2d"
     },
     {
       "path": "lotor/lifecycle_test.go",
@@ -53,7 +61,7 @@
     },
     {
       "path": "lotor/wire.go",
-      "sha256": "a0c1d7b654a340890ee17c00f585f39ea60c552e2c2aff719a17eaac96200969"
+      "sha256": "8f308e4ee934aee20c93c255868dd84574cb1839400d93fd03f37fd341be226b"
     },
     {
       "path": "lotorhttp/control_test.go",

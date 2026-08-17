@@ -647,6 +647,38 @@ type OrganizationInvitation struct {
 	SeatReserved bool
 }
 
+type InvitationResourceGrant struct {
+	Resource, Relation, KeyResource string
+	KeyVersion                      uint64
+}
+
+// EncryptedInvitationCreatePinned persists the intended encrypted-resource grants with the
+// invitation. Acceptance creates pending grants; access remains unavailable until their signed
+// resource-key envelopes are submitted.
+func (c *Client) EncryptedInvitationCreatePinned(
+	scope, actor, invitationID, invitee, role, ticket string,
+	expiresAt uint64,
+	idempotencyKey string,
+	pin CompositionPin,
+	grants []InvitationResourceGrant,
+) (LifecycleResult, error) {
+	values := make([]value, 0, len(grants))
+	for _, grant := range grants {
+		values = append(values, vMap(map[string]value{
+			"resource": vAddr(grant.Resource), "relation": vStr(grant.Relation),
+			"key_resource": vAddr(grant.KeyResource), "key_version": vU64(grant.KeyVersion),
+		}))
+	}
+	result, err := c.do(opENCRYPTEDINVITECREATE, []value{
+		vAddr(scope), vAddr(actor), vStr(invitationID), vAddr(invitee), vStr(role), vStr(ticket),
+		vU64(expiresAt), vStr(idempotencyKey), capacityPin(pin), vList(values),
+	})
+	if err != nil {
+		return LifecycleResult{}, err
+	}
+	return decodeLifecycleResult(result), nil
+}
+
 // InvitationCreatePinned creates an invitation and applies the active Seat Board lifecycle in one
 // durable Lotor transition. Ticket is returned/delivered by the caller but only its SHA-256 digest
 // is persisted by lotord.
@@ -673,6 +705,18 @@ func (c *Client) InvitationAccept(
 ) (LifecycleResult, error) {
 	values, err := c.do(opINVITEACCEPT, []value{
 		vStr(ticket), vAddr(authenticatedInvitee), vAddr(memberSubject), vStr(idempotencyKey),
+	})
+	if err != nil {
+		return LifecycleResult{}, err
+	}
+	return decodeLifecycleResult(values), nil
+}
+
+func (c *Client) EncryptedInvitationAccept(
+	ticket, authenticatedInvitee, memberSubject, recipientKeyID, idempotencyKey string,
+) (LifecycleResult, error) {
+	values, err := c.do(opENCRYPTEDINVITEACCEPT, []value{
+		vStr(ticket), vAddr(authenticatedInvitee), vAddr(memberSubject), vStr(recipientKeyID), vStr(idempotencyKey),
 	})
 	if err != nil {
 		return LifecycleResult{}, err
