@@ -128,6 +128,59 @@ The gateway exposes invitation acceptance and cancellation only. It returns
 sanitized public fields and does not return runtime credentials, Control
 bearers, canonical scope, or provider secrets.
 
+## Resource graph management and workload execution
+
+`lotorhttp.ControlClient` uses the application's secret key for trusted
+resource, Catalog, payload, and resource-credential administration. A workload
+must use the separate `lotorhttp.ResourceClient`; its constructor accepts only
+the application publishable key and a Lotor-issued resource credential.
+
+```go
+workload, err := lotorhttp.NewResourceClient(lotorhttp.ResourceClientOptions{
+    BaseURL:            os.Getenv("LOTOR_API_URL"),
+    ClientID:           os.Getenv("LOTOR_CLIENT_ID"),
+    PublishableKey:     os.Getenv("LOTOR_PUBLISHABLE_KEY"),
+    ResourceCredential: os.Getenv("LOTOR_RESOURCE_CREDENTIAL"),
+})
+if err != nil {
+    return err
+}
+
+preflight, err := workload.PreflightExecution(ctx, "integration:slack", lotorhttp.ResourceExecutionRequest{
+    Method: "POST", Path: "/chat.postMessage", ContentType: "application/json",
+    RequestBodyDigest: bodySHA256, RequestBodySize: int64(len(body)),
+})
+if err != nil {
+    return err
+}
+// Raw-mode authorization does not carry a protected request. For encrypted
+// execution, supply the protected request and response policy from preflight.
+authorization, err := workload.CommitExecution(ctx, "integration:slack", preflight,
+    lotorhttp.ResourceExecutionCommitInput{})
+```
+
+The preflight token is server-issued, short-lived, and also serves as the
+commit idempotency identity. There is no plan ID or caller-generated execution
+idempotency key. Commit revalidates the resource, credential, Catalog entry,
+payload, policy, and custody revisions before returning authorization evidence.
+It never returns a custody endpoint or provider credential bytes.
+
+## Verify application-gateway assertions
+
+Origins behind a Lotor application gateway should combine a deployment-owned
+origin boundary (for example, verified mTLS) with `GatewayAssertionMiddleware`.
+Configure one verifier with the exact audience, route pin, configuration
+version, binding epoch, and gateway/runtime placement epochs expected by that
+handler. The middleware rejects direct traffic, validates the signed request
+body and query hashes, strips the assertion header, and places verified claims
+in the request context.
+
+Replay-ineligible mutations additionally require a shared atomic
+`GatewayAssertionReplayStore`; if that store is absent or unavailable, the
+request fails closed. Replay-eligible mutations require a signed, matching
+idempotency key. Do not derive verifier authority from request headers or from
+the assertion itself.
+
 ## Compatibility
 
 `v0.1.x` speaks LWP protocol version 1 and supports Control ownership assertions

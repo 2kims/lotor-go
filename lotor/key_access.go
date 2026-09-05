@@ -3,11 +3,18 @@ package lotor
 // SubjectKeyRegistration contains client-generated device public keys and an optional opaque,
 // passphrase-protected private-key backup. Passphrases and plaintext private keys must never be
 // placed in this structure.
+//
+//nolint:govet // Field order mirrors the public key-registration contract.
 type SubjectKeyRegistration struct {
 	Actor                     string
 	Subject                   string
 	KeyID                     string
 	DeviceID                  string
+	Generation                uint64
+	CustodyMode               string
+	CustodyStatus             string
+	Transferability           string
+	KeyRevision               uint64
 	EncryptionAlgorithm       string
 	EncryptionPublicKey       []byte
 	SigningAlgorithm          string
@@ -16,30 +23,35 @@ type SubjectKeyRegistration struct {
 	BackupKDF                 string
 	BackupSalt                []byte
 	BackupNonce               []byte
-	BackupFormatVersion       uint64
 	Proof                     []byte
+	BackupFormatVersion       uint64
 }
 
 type SubjectKeyMutation struct {
-	Accepted bool
 	Reason   string
 	KeyID    string
 	LogSeq   uint64
+	Accepted bool
 }
 
 type SubjectKey struct {
 	KeyID                     string
 	DeviceID                  string
 	EncryptionAlgorithm       string
-	EncryptionPublicKey       []byte
 	SigningAlgorithm          string
+	BackupKDF                 string
+	Status                    string
+	CustodyMode               string
+	CustodyStatus             string
+	Transferability           string
+	EncryptionPublicKey       []byte
 	SigningPublicKey          []byte
 	EncryptedPrivateKeyBackup []byte
-	BackupKDF                 string
 	BackupSalt                []byte
 	BackupNonce               []byte
-	Status                    string
 	BackupFormatVersion       uint64
+	Generation                uint64
+	KeyRevision               uint64
 	LogSeq                    uint64
 }
 
@@ -50,7 +62,8 @@ func (c *Client) SubjectKeyRegister(input SubjectKeyRegistration) (SubjectKeyMut
 		vStr(input.SigningAlgorithm), vBytes(input.SigningPublicKey),
 		vBytes(input.EncryptedPrivateKeyBackup), vStr(input.BackupKDF),
 		vBytes(input.BackupSalt), vBytes(input.BackupNonce), vU64(input.BackupFormatVersion),
-		vBytes(input.Proof),
+		vBytes(input.Proof), vU64(input.Generation), vStr(input.CustodyMode),
+		vStr(input.CustodyStatus), vStr(input.Transferability), vU64(input.KeyRevision),
 	})
 	if err != nil {
 		return SubjectKeyMutation{}, err
@@ -81,6 +94,9 @@ func (c *Client) SubjectKeyList(actor, subject string) ([]SubjectKey, error) {
 		}
 		result = append(result, SubjectKey{
 			KeyID: item.Map["key_id"].asStr(), DeviceID: item.Map["device_id"].asStr(),
+			Generation: item.Map["generation"].U64, CustodyMode: item.Map["custody_mode"].asStr(),
+			CustodyStatus: item.Map["custody_status"].asStr(), Transferability: item.Map["transferability"].asStr(),
+			KeyRevision:               item.Map["key_revision"].U64,
 			EncryptionAlgorithm:       item.Map["encryption_algorithm"].asStr(),
 			EncryptionPublicKey:       append([]byte(nil), item.Map["encryption_public_key"].Bytes...),
 			SigningAlgorithm:          item.Map["signing_algorithm"].asStr(),
@@ -114,8 +130,9 @@ func decodeSubjectKeyMutation(values []value) SubjectKeyMutation {
 }
 
 type ResourceKeyVersionInput struct {
-	Scope, Actor, KeyResource, Algorithm string
-	Version                              uint64
+	Scope, Actor, KeyResource, Algorithm, CustodyHandle, ManifestHash string
+	Version, GraphRevision, IdentityRevision, KeyRevision             uint64
+	PolicyRevision, CustodyRevision, ExpectedEnvelopes                uint64
 }
 
 type ResourceGrantInput struct {
@@ -125,38 +142,41 @@ type ResourceGrantInput struct {
 }
 
 type ResourceEnvelopeInput struct {
-	Scope, Actor, GrantID, KeyResource, RecipientSubject string
-	RecipientKeyID, EncryptionSuite, Issuer, IssuerKeyID string
-	KeyVersion                                           uint64
-	Ciphertext, AADHash, Signature                       []byte
+	ClientID, Scope, Actor, GrantID, KeyResource, RecipientSubject string
+	RecipientKeyID, EncryptionSuite, Issuer, IssuerKeyID           string
+	Ciphertext, AADHash, Signature                                 []byte
+	KeyVersion                                                     uint64
 }
 
 type ResourceGrantMutation struct {
-	Accepted                bool
 	Reason, GrantID, Status string
 	LogSeq                  uint64
+	Accepted                bool
 }
 
 type ResourceMember struct {
-	GrantID, Subject, Relation, Resource, KeyResource string
-	RecipientKeyID, InvitationID, Status              string
-	KeyVersion, LogSeq                                uint64
-	RecipientKeyStatus, RecipientEncryptionAlgorithm  string
-	RecipientEncryptionPublicKey                      []byte
-	RecipientSigningAlgorithm                         string
-	RecipientSigningPublicKey                         []byte
+	GrantID, Subject, Relation, Resource, KeyResource       string
+	RecipientKeyID, InvitationID, Status                    string
+	RecipientKeyStatus, RecipientEncryptionAlgorithm        string
+	RecipientSigningAlgorithm                               string
+	RecipientEncryptionPublicKey, RecipientSigningPublicKey []byte
+	KeyVersion, LogSeq                                      uint64
 }
 
 type ResourceEnvelope struct {
 	GrantID, KeyResource, RecipientKeyID, EncryptionSuite, Issuer string
-	IssuerKeyID                                                   string
-	KeyVersion, LogSeq                                            uint64
-	Ciphertext, AADHash, Signature                                []byte
+	IssuerKeyID, IssuerSigningAlgorithm, IssuerKeyStatus          string
 	Scope, Resource, RecipientSubject, Relation                   string
+	Ciphertext, AADHash, Signature, IssuerSigningPublicKey        []byte
+	KeyVersion, LogSeq                                            uint64
 }
 
 func (c *Client) ResourceKeyVersionCreate(input ResourceKeyVersionInput) (SubjectKeyMutation, error) {
-	values, err := c.do(opRESOURCEKEYCREATE, []value{vAddr(input.Scope), vAddr(input.Actor), vAddr(input.KeyResource), vU64(input.Version), vStr(input.Algorithm)})
+	values, err := c.do(opRESOURCEKEYCREATE, []value{
+		vAddr(input.Scope), vAddr(input.Actor), vAddr(input.KeyResource), vU64(input.Version), vStr(input.Algorithm),
+		vStr(input.CustodyHandle), vStr(input.ManifestHash), vU64(input.GraphRevision), vU64(input.IdentityRevision),
+		vU64(input.KeyRevision), vU64(input.PolicyRevision), vU64(input.CustodyRevision), vU64(input.ExpectedEnvelopes),
+	})
 	if err != nil {
 		return SubjectKeyMutation{}, err
 	}
@@ -170,6 +190,18 @@ func (c *Client) ResourceKeyVersionCreate(input ResourceKeyVersionInput) (Subjec
 	if len(values) > 2 {
 		result.KeyID = values[2].asStr()
 	}
+	if len(values) > 4 {
+		result.LogSeq = values[4].U64
+	}
+	return result, nil
+}
+
+func (c *Client) ResourceKeyVersionActivate(scope, actor, keyResource string, version uint64, manifestHash string) (SubjectKeyMutation, error) {
+	values, err := c.do(opRESOURCEKEYACTIVATE, []value{vAddr(scope), vAddr(actor), vAddr(keyResource), vU64(version), vStr(manifestHash)})
+	if err != nil {
+		return SubjectKeyMutation{}, err
+	}
+	result := decodeSubjectKeyMutation(values)
 	if len(values) > 4 {
 		result.LogSeq = values[4].U64
 	}
@@ -194,6 +226,7 @@ func (c *Client) ResourceEnvelopeSubmit(input ResourceEnvelopeInput) (ResourceGr
 		vU64(input.KeyVersion), vAddr(input.RecipientSubject), vStr(input.RecipientKeyID),
 		vStr(input.EncryptionSuite), vBytes(input.Ciphertext), vBytes(input.AADHash),
 		vAddr(input.Issuer), vStr(input.IssuerKeyID), vBytes(input.Signature),
+		vStr(input.ClientID),
 	})
 	if err != nil {
 		return ResourceGrantMutation{}, err
@@ -215,8 +248,11 @@ func (c *Client) ResourceEnvelopeGetSelf(actor, subject, resource string) (Resou
 		KeyVersion: item["key_version"].U64, RecipientKeyID: item["recipient_key_id"].asStr(),
 		EncryptionSuite: item["encryption_suite"].asStr(), Ciphertext: append([]byte(nil), item["ciphertext"].Bytes...),
 		AADHash: append([]byte(nil), item["aad_hash"].Bytes...), Issuer: item["issuer"].asStr(),
-		IssuerKeyID: item["issuer_key_id"].asStr(),
-		Signature:   append([]byte(nil), item["signature"].Bytes...), LogSeq: item["log_seq"].U64,
+		IssuerKeyID:            item["issuer_key_id"].asStr(),
+		IssuerSigningAlgorithm: item["issuer_signing_algorithm"].asStr(),
+		IssuerSigningPublicKey: append([]byte(nil), item["issuer_signing_public_key"].Bytes...),
+		IssuerKeyStatus:        item["issuer_key_status"].asStr(),
+		Signature:              append([]byte(nil), item["signature"].Bytes...), LogSeq: item["log_seq"].U64,
 		Scope: item["scope"].asStr(), Resource: item["resource"].asStr(),
 		RecipientSubject: item["recipient_subject"].asStr(), Relation: item["relation"].asStr(),
 	}, true, nil

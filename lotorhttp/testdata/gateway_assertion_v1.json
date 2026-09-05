@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "public_key_spki_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\n-----END PUBLIC KEY-----\n",
+  "public_key_raw_base64url": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+  "assertion": "v1.eyJpc3MiOiJnYXRld2F5LW93bmVyL2dhdGV3YXktcGxhY2VtZW50Iiwia2lkIjoiZ2F0ZXdheS1rZXktMSIsImF1ZCI6Imh0dHBzOi8vYXBpLm9yaWdpbi5leGFtcGxlIiwic3ViIjoidXNlcjpraW0iLCJzaWRfaGFzaCI6Ijg3N2YzZTE4OTE5NDk4Mjg4NjE4NTU1NDNkY2EwMDk1MjYzYWEzNTYwNjNjYjQ3YzRlZjlmYTdlZTljNTlmOTQiLCJ0ZW5hbnRfaWQiOiJ0ZW5hbnQtYXBwIiwiYXBwbGljYXRpb25faWQiOiJhcHAtd2ViIiwiZW52aXJvbm1lbnRfaWQiOiJlbnYtcHJvZCIsImJpbmRpbmdfaWQiOiJiaW5kaW5nLWFwcCIsInJvdXRlX2lkIjoiYXBpIiwicm91dGVfcGluIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsImdhdGV3YXlfcGxhY2VtZW50X2lkIjoiZ2F0ZXdheS1wbGFjZW1lbnQiLCJnYXRld2F5X293bmVyc2hpcF9lcG9jaCI6MywicnVudGltZV9wbGFjZW1lbnRfaWQiOiJydW50aW1lLXBsYWNlbWVudCIsInJ1bnRpbWVfb3duZXJzaGlwX2Vwb2NoIjo5LCJvcGVyYXRpb24iOiJ2YXVsdC53cml0ZSIsIm1ldGhvZCI6IlBPU1QiLCJwYXRoIjoiL2ludGVybmFsL2FwaS92YXVsdHMiLCJyZXF1ZXN0X2lkIjoicmVxdWVzdC1nb2xkZW4tMSIsImJvZHlfc2hhMjU2IjoiMjllMTZhM2M3Y2Q4YTc0N2NhNzVkZjM4YTFlZWI0OGEyZTFhYzBjYTQ5NjMwNTA4YzcyMzMyMGIyMTQ1N2M3MCIsInF1ZXJ5X3NoYTI1NiI6IjljNzRmNzJjNjc1Zjk4NTIxMzQ0NDg1ZWY2MWM2N2E5MDgwNDE2ZmUzNjkyYjNjYTM5ZWY2NjIyODkyNjYyNjQiLCJpZGVtcG90ZW5jeV9rZXlfc2hhMjU2IjoiNGIzOWVjMjNmNDdkOGJhY2Q1ZWVlMzc4NjcwNzM4ZTY3YWM3ZDg5NDBhNTlmYTA2ODJlMzI0ZjE4M2YwMWIwYSIsImlhdCI6MTkwMDAwMDAwMCwiZXhwIjoxOTAwMDAwMDEwLCJjb25maWd1cmF0aW9uX3ZlcnNpb24iOjExLCJiaW5kaW5nX2FjdGl2YXRpb25fZXBvY2giOjcsInJlcGxheV9lbGlnaWJsZSI6dHJ1ZX0.izinK6DPY9M2zou75bW9_Rd8VG-tcGnvYIDFWiL09DjsWeTGHHSPN4lvAqBLSnT9tqB4OyXrf7R7d2sEXFwKDg",
+  "claims": {
+    "iss": "gateway-owner/gateway-placement",
+    "kid": "gateway-key-1",
+    "aud": "https://api.origin.example",
+    "sub": "user:kim",
+    "sid_hash": "877f3e1891949828861855543dca0095263aa356063cb47c4ef9fa7ee9c59f94",
+    "tenant_id": "tenant-app",
+    "application_id": "app-web",
+    "environment_id": "env-prod",
+    "binding_id": "binding-app",
+    "route_id": "api",
+    "route_pin": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "gateway_placement_id": "gateway-placement",
+    "gateway_ownership_epoch": 3,
+    "runtime_placement_id": "runtime-placement",
+    "runtime_ownership_epoch": 9,
+    "operation": "vault.write",
+    "method": "POST",
+    "path": "/internal/api/vaults",
+    "request_id": "request-golden-1",
+    "body_sha256": "29e16a3c7cd8a747ca75df38a1eeb48a2e1ac0ca49630508c723320b21457c70",
+    "query_sha256": "9c74f72c675f98521344485ef61c67a9080416fe3692b3ca39ef662289266264",
+    "idempotency_key_sha256": "4b39ec23f47d8bacd5eee378670738e67ac7d8940a59fa0682e324f183f01b0a",
+    "iat": 1900000000,
+    "exp": 1900000010,
+    "configuration_version": 11,
+    "binding_activation_epoch": 7,
+    "replay_eligible": true
+  },
+  "request": {
+    "method": "POST",
+    "path": "/internal/api/vaults",
+    "raw_query": "include=members",
+    "body_base64url": "b3BhcXVlLWVuY3J5cHRlZC1wYXlsb2Fk",
+    "idempotency_key": "mutation-1"
+  },
+  "now": 1900000005
+}

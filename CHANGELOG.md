@@ -4,6 +4,11 @@ All notable public API and compatibility changes are documented here. This
 project follows Semantic Versioning; breaking changes during `v0.x` releases
 are called out explicitly.
 
+## Unreleased
+
+- Add fail-closed Ed25519 gateway assertion verification and HTTP middleware
+  with exact route, placement, request, expiry, origin, and replay checks.
+
 ## v0.1.0-rc.2
 
 - Add client-owned subject key enrollment and encrypted resource key-envelope
