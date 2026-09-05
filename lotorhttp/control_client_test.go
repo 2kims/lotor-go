@@ -79,3 +79,63 @@ func TestControlClientDoesNotForwardSecretAcrossRedirect(t *testing.T) {
 		t.Fatal("application secret reached redirect destination")
 	}
 }
+
+func TestControlClientIssuesResourceCredentialWithExactPrincipalAndIdempotency(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/public/applications/client_test/resources/api_key:key/credentials" ||
+			r.Header.Get("X-Lotor-Secret-Key") != "sk_test_secret" || r.Header.Get("Idempotency-Key") != "issue-1" {
+			t.Fatalf("unexpected request: %s %s headers=%v", r.Method, r.URL.Path, r.Header)
+		}
+		var input ResourceCredentialIssueInput
+		if json.NewDecoder(r.Body).Decode(&input) != nil || input.IssuedTo != "service_account:worker" {
+			t.Fatalf("input=%+v", input)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"rcred_1","resource":"api_key:key","issued_to":"service_account:global","status":"active","display_hint":"ltrc_***","version":1,"created_at":1,"credential":"ltrc_secret"}`))
+	}))
+	defer server.Close()
+	client, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "client_test", SecretKey: "sk_test_secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued, err := client.IssueResourceCredential(t.Context(), "api_key:key", ResourceCredentialIssueInput{IssuedTo: "service_account:worker"}, "issue-1")
+	if err != nil || issued.Credential != "ltrc_secret" || issued.IssuedTo != "service_account:global" {
+		t.Fatalf("issued=%+v error=%v", issued, err)
+	}
+}
+
+func TestControlClientPayloadUploadCarriesOnlyServerIssuedPayloadToken(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		switch requests {
+		case 1:
+			if r.URL.Path != "/v1/public/applications/client_test/resources/integration:slack/payloads/provider_credential/uploads" || r.Header.Get("Lotor-Payload-Token") != "" {
+				t.Fatalf("begin request=%s headers=%v", r.URL.Path, r.Header)
+			}
+			w.Header().Set("Lotor-Payload-Token", "payload_token_abcdefghijklmnopqrstuvwxyz")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"resource":"integration:slack","slot":"provider_credential","payload_version":1,"expected_payload_version":0,"upload_url":"https://objects.example/upload","upload_method":"PUT","required_headers":{},"expires_at":100}`))
+		case 2:
+			if r.URL.Path != "/v1/public/applications/client_test/resources/integration:slack/payloads/provider_credential/commits" || r.Header.Get("Lotor-Payload-Token") != "payload_token_abcdefghijklmnopqrstuvwxyz" {
+				t.Fatalf("commit request=%s headers=%v", r.URL.Path, r.Header)
+			}
+			_, _ = w.Write([]byte(`{"resource":"integration:slack","slot":"provider_credential","schema_id":"avault.credential.v1","payload_version":1,"representation":"raw","object_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","object_size":2,"resource_revision":2,"lifecycle_generation":1,"state":"committed","committed_at":100}`))
+		}
+	}))
+	defer server.Close()
+	client, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "client_test", SecretKey: "sk_test_secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent, err := client.BeginResourcePayloadUpload(t.Context(), "integration:slack", "provider_credential", ResourcePayloadUploadInput{SchemaID: "avault.credential.v1", Representation: "raw", ObjectDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ObjectSize: 2, ResourceRevision: 2, LifecycleGeneration: 1})
+	if err != nil || intent.Token == "" {
+		t.Fatalf("intent=%+v error=%v", intent, err)
+	}
+	manifest, err := client.CommitResourcePayload(t.Context(), "integration:slack", "provider_credential", intent)
+	if err != nil || manifest.PayloadVersion != 1 || requests != 2 {
+		t.Fatalf("manifest=%+v requests=%d error=%v", manifest, requests, err)
+	}
+}

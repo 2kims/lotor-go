@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "93203d816ad80a4a0ed5948c599c8f85ff4cce74",
+  "source_commit": "62d17da1b57ffa6eaee8de123066013853471203",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -65,11 +65,11 @@
     },
     {
       "path": "lotorhttp/control_client_test.go",
-      "sha256": "f0af6017e3e5b16a39b81e578ec48e2008b77884e34cd35758533e0e0e7b1943"
+      "sha256": "a7697de3a18f918e18b12b3bf68ece2e9ee412cf95f2ab8f86449bb23175b69f"
     },
     {
       "path": "lotorhttp/control_client.go",
-      "sha256": "07cc46822cd21f482b9c7b8f2cb4b1edc2b895ffb929951f57f51bdf50deeaf1"
+      "sha256": "751f2b8b1d58733fe574cf0b8925f035cbdf043f345a3fdd3d62577bb92f4561"
     },
     {
       "path": "lotorhttp/control_test.go",
@@ -96,6 +96,14 @@
       "sha256": "e52499a6e7a084927756917f9eafcc59ab50d139ab15753429531765a7cfa2f2"
     },
     {
+      "path": "lotorhttp/resource_client_test.go",
+      "sha256": "35a471480eb93c9b0a7a709f915ca93ab38349d46cd507e91ac854ca6d7b8c24"
+    },
+    {
+      "path": "lotorhttp/resource_client.go",
+      "sha256": "d68bdcdd775995d4f7b7497c7a6d9f023a3e8aa3c0c34a62a9c3914fc6537c8c"
+    },
+    {
       "path": "lotorhttp/runtime.go",
       "sha256": "59d23d5c5e00c6920da28aeec362c4a3b5ac5a9738f1155f2050da08c4096d67"
     },
@@ -105,7 +113,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "4e5a6c6f77578dad86be00d2a2e0d240f979ed37e938e3d2dd5ba38d2f929641"
+      "sha256": "96408243345382ab72e3513cbde63870dcfae2cc5879eaf9846ef26f1dd6d7c0"
     },
     {
       "path": "scripts/check-consumer.sh",

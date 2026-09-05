@@ -66,6 +66,35 @@ type DurableOperation struct {
 	UpdatedAt   int64  `json:"updated_at"`
 }
 
+type ResourceCredentialMetadata struct {
+	ID          string `json:"id"`
+	Resource    string `json:"resource"`
+	IssuedTo    string `json:"issued_to"`
+	Status      string `json:"status"`
+	DisplayHint string `json:"display_hint"`
+	Version     int64  `json:"version"`
+	CreatedAt   int64  `json:"created_at"`
+	ExpiresAt   int64  `json:"expires_at,omitempty"`
+	RevokeAt    int64  `json:"revoke_at,omitempty"`
+	RevokedAt   int64  `json:"revoked_at,omitempty"`
+	LastUsedAt  int64  `json:"last_used_at,omitempty"`
+}
+
+type IssuedResourceCredential struct {
+	Credential string `json:"credential"`
+	ResourceCredentialMetadata
+}
+
+type ResourceCredentialIssueInput struct {
+	IssuedTo  string `json:"issued_to"`
+	ExpiresAt int64  `json:"expires_at,omitempty"`
+}
+
+type ResourceCredentialRotateInput struct {
+	RevokePreviousAt int64 `json:"revoke_previous_at"`
+	ExpiresAt        int64 `json:"expires_at,omitempty"`
+}
+
 type ControlError struct {
 	Code    string
 	Message string
@@ -192,6 +221,65 @@ func (c *ControlClient) BindResourceCatalog(ctx context.Context, resource string
 	return c.operationRequest(ctx, http.MethodPut, "/resources/"+url.PathEscape(requiredControl(resource, "resource"))+"/catalog-binding", key, input)
 }
 
+func (c *ControlClient) IssueResourceCredential(ctx context.Context, resource string, input ResourceCredentialIssueInput, key string) (IssuedResourceCredential, error) {
+	var out IssuedResourceCredential
+	err := c.request(ctx, http.MethodPost, resourcePath(resource)+"/credentials", key, input, &out)
+	return out, err
+}
+
+func (c *ControlClient) ResourceCredentials(ctx context.Context, resource string) ([]ResourceCredentialMetadata, error) {
+	var out struct {
+		Items []ResourceCredentialMetadata `json:"items"`
+	}
+	err := c.request(ctx, http.MethodGet, resourcePath(resource)+"/credentials", "", nil, &out)
+	return out.Items, err
+}
+
+func (c *ControlClient) RotateResourceCredential(ctx context.Context, resource, credentialID string, input ResourceCredentialRotateInput, key string) (IssuedResourceCredential, error) {
+	var out IssuedResourceCredential
+	err := c.request(ctx, http.MethodPost, resourcePath(resource)+"/credentials/"+url.PathEscape(requiredControl(credentialID, "credential ID"))+"/rotate", key, input, &out)
+	return out, err
+}
+
+func (c *ControlClient) RevokeResourceCredential(ctx context.Context, resource, credentialID, key string) (ResourceCredentialMetadata, error) {
+	var out ResourceCredentialMetadata
+	err := c.request(ctx, http.MethodDelete, resourcePath(resource)+"/credentials/"+url.PathEscape(requiredControl(credentialID, "credential ID")), key, nil, &out)
+	return out, err
+}
+
+func (c *ControlClient) BeginResourcePayloadUpload(ctx context.Context, resource, slot string, input ResourcePayloadUploadInput) (ResourcePayloadUploadIntent, error) {
+	var out ResourcePayloadUploadIntent
+	headers, err := c.requestHeaders(ctx, http.MethodPost, resourcePayloadPath(resource, slot)+"/uploads", "", nil, input, &out)
+	if err != nil {
+		return ResourcePayloadUploadIntent{}, err
+	}
+	out.Token = strings.TrimSpace(headers.Get("Lotor-Payload-Token"))
+	if out.Token == "" {
+		return ResourcePayloadUploadIntent{}, errors.New("Lotor payload upload omitted its token")
+	}
+	return out, nil
+}
+
+func (c *ControlClient) UploadResourcePayloadObject(ctx context.Context, intent ResourcePayloadUploadIntent, object []byte) error {
+	return uploadResourcePayloadObject(ctx, c.httpClient, intent, object)
+}
+
+func (c *ControlClient) CommitResourcePayload(ctx context.Context, resource, slot string, intent ResourcePayloadUploadIntent) (ResourcePayloadManifest, error) {
+	var out ResourcePayloadManifest
+	_, err := c.requestHeaders(ctx, http.MethodPost, resourcePayloadPath(resource, slot)+"/commits", "", http.Header{
+		"Lotor-Payload-Token": []string{requiredControl(intent.Token, "payload token")},
+	}, struct {
+		ExpectedPayloadVersion int64 `json:"expected_payload_version"`
+	}{intent.ExpectedPayloadVersion}, &out)
+	return out, err
+}
+
+func (c *ControlClient) DeleteResourcePayload(ctx context.Context, resource, slot, key string) (ResourcePayloadMutation, error) {
+	var out ResourcePayloadMutation
+	err := c.request(ctx, http.MethodDelete, resourcePayloadPath(resource, slot), key, nil, &out)
+	return out, err
+}
+
 func (c *ControlClient) lifecycle(ctx context.Context, resource, action string, fence ResourceLifecycleFence, key string) (DurableOperation, error) {
 	return c.operationRequest(ctx, http.MethodPost, "/resources/"+url.PathEscape(requiredControl(resource, "resource"))+"/"+action, key, fence)
 }
@@ -203,17 +291,22 @@ func (c *ControlClient) operationRequest(ctx context.Context, method, path, key 
 }
 
 func (c *ControlClient) request(ctx context.Context, method, path, key string, body, out any) error {
+	_, err := c.requestHeaders(ctx, method, path, key, nil, body, out)
+	return err
+}
+
+func (c *ControlClient) requestHeaders(ctx context.Context, method, path, key string, extra http.Header, body, out any) (http.Header, error) {
 	var reader io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		reader = bytes.NewReader(raw)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+"/v1/public/applications/"+url.PathEscape(c.clientID)+path, reader)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Lotor-Secret-Key", c.secretKey)
@@ -223,17 +316,22 @@ func (c *ControlClient) request(ctx context.Context, method, path, key string, b
 	if key != "" {
 		req.Header.Set("Idempotency-Key", requiredControl(key, "idempotency key"))
 	}
+	for name, values := range extra {
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
+	}
 	response, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer response.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(response.Body, (4<<20)+1))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(raw) > 4<<20 {
-		return errors.New("Lotor response exceeds limit")
+		return nil, errors.New("Lotor response exceeds limit")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		var problem struct{ Code, Error string }
@@ -244,15 +342,15 @@ func (c *ControlClient) request(ctx context.Context, method, path, key string, b
 		if problem.Error == "" {
 			problem.Error = fmt.Sprintf("Lotor request failed with status %d", response.StatusCode)
 		}
-		return &ControlError{Status: response.StatusCode, Code: problem.Code, Message: problem.Error}
+		return nil, &ControlError{Status: response.StatusCode, Code: problem.Code, Message: problem.Error}
 	}
 	if out == nil || response.StatusCode == http.StatusNoContent {
-		return nil
+		return response.Header.Clone(), nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
-		return errors.New("invalid Lotor response")
+		return nil, errors.New("invalid Lotor response")
 	}
-	return nil
+	return response.Header.Clone(), nil
 }
 
 func requiredControl(value, name string) string {
