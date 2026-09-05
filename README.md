@@ -128,6 +128,22 @@ The gateway exposes invitation acceptance and cancellation only. It returns
 sanitized public fields and does not return runtime credentials, Control
 bearers, canonical scope, or provider secrets.
 
+## Verify application-gateway assertions
+
+Origins behind a Lotor application gateway should combine a deployment-owned
+origin boundary (for example, verified mTLS) with `GatewayAssertionMiddleware`.
+Configure one verifier with the exact audience, route pin, configuration
+version, binding epoch, and gateway/runtime placement epochs expected by that
+handler. The middleware rejects direct traffic, validates the signed request
+body and query hashes, strips the assertion header, and places verified claims
+in the request context.
+
+Replay-ineligible mutations additionally require a shared atomic
+`GatewayAssertionReplayStore`; if that store is absent or unavailable, the
+request fails closed. Replay-eligible mutations require a signed, matching
+idempotency key. Do not derive verifier authority from request headers or from
+the assertion itself.
+
 ## Compatibility
 
 `v0.1.x` speaks LWP protocol version 1 and supports Control ownership assertions

@@ -127,8 +127,8 @@ func TestCancelUsesPublicOrganizationButSessionDerivedActor(t *testing.T) {
 	handler, _, _, runtime := fixtureHandler()
 	runtime.result.Reason = "cancelled"
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, commandRequest("/api/lotor/invitations/cancel", `{"organization":"org:acme","invitation_id":"inv_2","idempotency_key":"cancel-key"}`))
-	if response.Code != http.StatusOK || runtime.call.kind != "cancel" || runtime.call.organization != "org:acme" ||
+	handler.ServeHTTP(response, commandRequest("/api/lotor/invitations/cancel", `{"organization":"workspace-acme","invitation_id":"inv_2","idempotency_key":"cancel-key"}`))
+	if response.Code != http.StatusOK || runtime.call.kind != "cancel" || runtime.call.organization != "workspace-acme" ||
 		runtime.call.invitationID != "inv_2" || runtime.call.identity.Subject != "user:member" ||
 		runtime.call.key != deriveKey("cancel-v1", "user:member", "cancel-key") {
 		t.Fatalf("status=%d call=%+v body=%s", response.Code, runtime.call, response.Body.String())
@@ -186,6 +186,8 @@ func TestBrowserMutationSecurityAndInputValidation(t *testing.T) {
 		{name: "cross site", mutate: func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "cross-site") }, body: `{"ticket":"ticket","idempotency_key":"key"}`, status: http.StatusForbidden},
 		{name: "cross origin", mutate: func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") }, body: `{"ticket":"ticket","idempotency_key":"key"}`, status: http.StatusForbidden},
 		{name: "unknown field", mutate: func(*http.Request) {}, body: `{"ticket":"ticket","idempotency_key":"key","scope":"org:other"}`, status: http.StatusBadRequest},
+		{name: "typed organization", mutate: func(*http.Request) {}, body: `{"organization":"org:personal-test","ticket":"ticket","idempotency_key":"key"}`, status: http.StatusBadRequest},
+		{name: "unrecognized organization", mutate: func(*http.Request) {}, body: `{"organization":"plain-id","ticket":"ticket","idempotency_key":"key"}`, status: http.StatusBadRequest},
 		{name: "empty key", mutate: func(*http.Request) {}, body: `{"ticket":"ticket","idempotency_key":""}`, status: http.StatusBadRequest},
 		{name: "oversized body", mutate: func(*http.Request) {}, body: `{"ticket":"` + strings.Repeat("x", maxRequestBody) + `","idempotency_key":"key"}`, status: http.StatusBadRequest},
 	}

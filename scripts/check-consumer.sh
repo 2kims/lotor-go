@@ -26,6 +26,7 @@ package consumer
 
 import (
 	"context"
+	"crypto/ed25519"
 	"net/http"
 
 	"github.com/2kims/lotor-go/lotor"
@@ -51,6 +52,26 @@ func Gateway() (http.Handler, error) {
 		CookieName: "application_session",
 		Sessions: sessions{},
 	})
+}
+
+func ProtectedOrigin() (http.Handler, error) {
+	verifier, err := lotorhttp.NewGatewayAssertionVerifier(lotorhttp.GatewayAssertionVerifierOptions{
+		Keys: map[string]ed25519.PublicKey{"gateway-key": make(ed25519.PublicKey, ed25519.PublicKeySize)},
+		Authority: lotorhttp.GatewayAssertionAuthority{
+			Issuer: "owner/placement", Audience: "https://api.example.test",
+			TenantID: "tenant", ApplicationID: "application", EnvironmentID: "environment",
+			BindingID: "binding", RouteID: "api",
+			RoutePin: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			GatewayPlacementID: "gateway", RuntimePlacementID: "runtime",
+			GatewayOwnershipEpoch: 1, RuntimeOwnershipEpoch: 1,
+			ConfigurationVersion: 1, BindingActivationEpoch: 1,
+		},
+	})
+	if err != nil { return nil, err }
+	return lotorhttp.GatewayAssertionMiddleware(lotorhttp.GatewayAssertionMiddlewareOptions{
+		Verifier: verifier, AuthenticateOrigin: lotorhttp.VerifiedClientCertificateOrigin,
+		MaxBodyBytes: 1 << 20,
+	}, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 }
 EOF
 

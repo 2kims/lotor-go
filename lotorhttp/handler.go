@@ -114,7 +114,7 @@ func (h *Handler) accept(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	if (input.Organization != "" && (!bounded(input.Organization, 256) || !strings.HasPrefix(input.Organization, "org:"))) || !bounded(input.Ticket, 512) || !bounded(input.IdempotencyKey, 256) {
+	if (input.Organization != "" && !organization(input.Organization)) || !bounded(input.Ticket, 512) || !bounded(input.IdempotencyKey, 256) {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
@@ -251,11 +251,43 @@ func bounded(value string, maximum int) bool {
 
 func organization(value string) bool {
 	value = strings.TrimSpace(value)
-	if !bounded(value, 256) || !strings.HasPrefix(value, "org:") {
+	if !bounded(value, 256) {
+		return false
+	}
+	for _, prefix := range []string{"personal-", "workspace-", "org_"} {
+		if suffix, found := strings.CutPrefix(value, prefix); found {
+			return organizationSuffix(suffix)
+		}
+	}
+	return organizationUUID(value)
+}
+
+func organizationSuffix(value string) bool {
+	if value == "" || len(value) > 240 {
 		return false
 	}
 	for _, character := range value {
-		if character <= 0x20 || character == 0x7f {
+		if !((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') || character == '-' || character == '_' || character == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+func organizationUUID(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	for index, character := range value {
+		if index == 8 || index == 13 || index == 18 || index == 23 {
+			if character != '-' {
+				return false
+			}
+			continue
+		}
+		if !((character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F') ||
+			(character >= '0' && character <= '9')) {
 			return false
 		}
 	}
