@@ -6,6 +6,23 @@ are called out explicitly.
 
 ## Unreleased
 
+- Add bounded, context-cancellable durable-operation polling to the Control
+  client. Failed and cancelled operations are returned for caller handling;
+  mutations are never retried.
+
+- Isolate payload storage transfers from caller cookie jars and reject
+  credential-bearing upload headers; storage responses cannot mutate the jar.
+
+- Add typed Control-client payload rewrap with delegated-user authority, key and
+  lifecycle fencing, and optional browser-custody attestation fields.
+
+- Add generic Control-client resource candidate search, link
+  preflight/commit/send, unlink, collaborator listing and structured resource
+  search with header-only link capabilities and strict response decoding.
+
+- Add delegated organization E2EE policy read/configuration and resource guest
+  policy mutation without application-authority fallback.
+
 - Add fail-closed Ed25519 gateway assertion verification and HTTP middleware
   with exact route, placement, request, expiry, origin, and replay checks.
 

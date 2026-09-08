@@ -412,6 +412,10 @@ func (c *ResourceClient) AccessResourcePayload(ctx context.Context, resource, sl
 }
 
 func (c *ResourceClient) DownloadResourcePayload(ctx context.Context, lease ResourcePayloadAccessLease) ([]byte, error) {
+	return downloadResourcePayload(ctx, c.httpClient, lease)
+}
+
+func downloadResourcePayload(ctx context.Context, client *http.Client, lease ResourcePayloadAccessLease) ([]byte, error) {
 	parsed, err := validatedObjectURL(lease.DownloadURL)
 	if err != nil || lease.DownloadMethod != http.MethodGet {
 		return nil, errors.New("invalid resource payload access lease")
@@ -420,7 +424,7 @@ func (c *ResourceClient) DownloadResourcePayload(ctx context.Context, lease Reso
 	if err != nil {
 		return nil, err
 	}
-	response, err := c.httpClient.Do(request)
+	response, err := payloadStorageClient(client).Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -454,12 +458,13 @@ func uploadResourcePayloadObject(ctx context.Context, client *http.Client, inten
 		return err
 	}
 	for name, value := range intent.RequiredHeaders {
-		if strings.EqualFold(name, "Authorization") || strings.EqualFold(name, "X-Lotor-Secret-Key") || strings.EqualFold(name, "X-Lotor-Publishable-Key") {
+		lower := strings.ToLower(name)
+		if lower == "authorization" || lower == "proxy-authorization" || lower == "cookie" || lower == "cookie2" || lower == "host" || lower == "origin" || strings.HasPrefix(lower, "x-lotor-") || strings.HasPrefix(lower, "lotor-") {
 			return errors.New("unsafe resource payload upload header")
 		}
 		request.Header.Set(name, value)
 	}
-	response, err := client.Do(request)
+	response, err := payloadStorageClient(client).Do(request)
 	if err != nil {
 		return err
 	}
@@ -469,6 +474,15 @@ func uploadResourcePayloadObject(ctx context.Context, client *http.Client, inten
 		return fmt.Errorf("resource payload upload failed with status %d", response.StatusCode)
 	}
 	return nil
+}
+
+// Storage requests must not read or mutate the caller's ambient cookie jar.
+// Custom transports remain responsible for not injecting their own credentials.
+func payloadStorageClient(client *http.Client) *http.Client {
+	isolated := *client
+	isolated.Jar = nil
+	isolated.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	return &isolated
 }
 
 func (c *ResourceClient) request(ctx context.Context, method, path string, headers http.Header, body, out any) (http.Header, error) {
