@@ -9,10 +9,55 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
+
+func TestPayloadStorageDoesNotUseAmbientCookiesOrCredentialHeaders(t *testing.T) {
+	requests := 0
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.Header.Get("Cookie") != "" {
+			t.Error("ambient cookie reached storage")
+		}
+		w.Header().Set("Set-Cookie", "from_storage=unexpected; Path=/")
+		_, _ = w.Write([]byte("payload"))
+	}))
+	defer storage.Close()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	objectURL, err := url.Parse(storage.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jar.SetCookies(objectURL, []*http.Cookie{{Name: "session", Value: "private", Path: "/"}})
+	client := &http.Client{Jar: jar}
+	lease := ResourcePayloadAccessLease{DownloadURL: storage.URL, DownloadMethod: http.MethodGet, ObjectSize: 7, ObjectDigest: fmt.Sprintf("%x", sha256.Sum256([]byte("payload")))}
+	if _, err = downloadResourcePayload(t.Context(), client, lease); err != nil {
+		t.Fatal(err)
+	}
+	intent := ResourcePayloadUploadIntent{UploadURL: storage.URL, UploadMethod: http.MethodPut}
+	if err = uploadResourcePayloadObject(t.Context(), client, intent, []byte("payload")); err != nil {
+		t.Fatal(err)
+	}
+	if cookies := jar.Cookies(objectURL); len(cookies) != 1 || cookies[0].Name != "session" {
+		t.Error("storage mutated caller cookie jar")
+	}
+	for _, name := range []string{"Cookie", "Authorization", "Proxy-Authorization", "Lotor-Payload-Token", "X-Lotor-Secret-Key"} {
+		intent.RequiredHeaders = map[string]string{name: "private"}
+		if err = uploadResourcePayloadObject(t.Context(), client, intent, []byte("payload")); err == nil {
+			t.Errorf("accepted unsafe header %s", name)
+		}
+	}
+	if requests != 2 {
+		t.Errorf("unsafe uploads reached storage: %d requests", requests)
+	}
+}
 
 func TestResourceClientPreflightAndCommitUseProductionCredentialsAndOneToken(t *testing.T) {
 	requests := 0
