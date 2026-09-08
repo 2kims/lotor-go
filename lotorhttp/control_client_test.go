@@ -1,11 +1,110 @@
 package lotorhttp
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 )
+
+func TestControlClientWaitsForDurableOperationWithBoundsAndCancellation(t *testing.T) {
+	reads := 0
+	var forcePending atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reads++
+		status := "running"
+		if reads > 1 && !forcePending.Load() {
+			status = "failed"
+		}
+		_, _ = w.Write([]byte(`{"id":"operation:one","kind":"resource_move","status":"` + status + `","target_kind":"resource","target_id":"vault:one","request_hash":"hash","error_code":"resource_conflict","created_at":1,"updated_at":2}`))
+	}))
+	defer server.Close()
+	client, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "client", SecretKey: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := client.WaitForOperation(t.Context(), "operation:one", OperationWaitOptions{MaxAttempts: 3})
+	if err != nil || result.Status != "failed" || result.ErrorCode != "resource_conflict" || reads != 2 {
+		t.Fatalf("operation=%+v reads=%d err=%v", result, reads, err)
+	}
+	if _, err = client.WaitForOperation(t.Context(), "operation:one", OperationWaitOptions{MaxAttempts: -1}); err == nil || reads != 2 {
+		t.Fatalf("invalid bounds reached transport reads=%d err=%v", reads, err)
+	}
+	if _, err = client.WaitForOperation(t.Context(), "operation:one", OperationWaitOptions{MaxAttempts: 10_001}); err == nil || reads != 2 {
+		t.Fatalf("invalid attempt limit reached transport reads=%d err=%v", reads, err)
+	}
+	if _, err = client.WaitForOperation(t.Context(), "operation:one", OperationWaitOptions{Interval: -1}); err == nil || reads != 2 {
+		t.Fatalf("invalid interval reached transport reads=%d err=%v", reads, err)
+	}
+	forcePending.Store(true)
+	if _, err = client.WaitForOperation(t.Context(), "operation:one", OperationWaitOptions{MaxAttempts: 1}); err == nil || reads != 3 {
+		t.Fatalf("bounded wait reads=%d err=%v", reads, err)
+	}
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err = client.WaitForOperation(cancelled, "operation:one", OperationWaitOptions{MaxAttempts: 3, Interval: time.Minute}); err == nil || reads != 3 {
+		t.Fatalf("cancelled wait reached transport reads=%d err=%v", reads, err)
+	}
+	waiting, stop := context.WithCancel(context.Background())
+	time.AfterFunc(10*time.Millisecond, stop)
+	if _, err = client.WaitForOperation(waiting, "operation:one", OperationWaitOptions{MaxAttempts: 3, Interval: time.Minute}); !errors.Is(err, context.Canceled) || reads != 4 {
+		t.Fatalf("delayed cancellation reads=%d err=%v", reads, err)
+	}
+}
+
+func TestControlPayloadRewrapPreservesCustodyAndDelegation(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/public/applications/app/resources/vault:one/payloads/config/rewraps" || r.Header.Get("Authorization") != "Bearer member" {
+			t.Error("incorrect rewrap route or delegated authority")
+		}
+		if calls == 3 {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+			return
+		}
+		if body["expected_wrap_revision"] != float64(0) || body["previous_key_version"] != float64(1) || body["key_version"] != float64(2) {
+			t.Error("lost rewrap version fences")
+		}
+		if calls == 1 && body["rewrap_receipt"] != nil {
+			t.Error("box request invented browser attestation")
+		}
+		if calls == 2 && body["rewrap_receipt"] != "receipt" {
+			t.Error("lost browser attestation")
+		}
+		_, _ = w.Write([]byte(`{"resource":"vault:one","slot":"config","payload_version":1,"wrap_revision":1,"previous_key_version":1,"key_version":2,"resource_revision":3,"lifecycle_generation":1,"key_binding_ref":"organization:acme","wrapped_payload_key":"wrapped","aad_hash":"hash","rewrapper_subject":"member","rewrapper_key_id":"key"}`))
+	}))
+	defer server.Close()
+	app, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "app", SecretKey: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := app.ForUser("member")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := ResourcePayloadRewrapInput{PayloadVersion: 1, KeyBindingRef: "organization:acme", PreviousKeyVersion: 1, KeyVersion: 2, ResourceRevision: 3, LifecycleGeneration: 1}
+	result, err := user.RewrapResourcePayload(t.Context(), "vault:one", "config", input)
+	if err != nil || result.WrapRevision != 1 || result.KeyVersion != 2 || result.KeyBindingRef != input.KeyBindingRef {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	input.WrappedPayloadKey, input.RewrapperSubject, input.RewrapperKeyID, input.RewrapReceipt = "wrapped", "member", "key", "receipt"
+	if _, err = user.RewrapResourcePayload(t.Context(), "vault:one", "config", input); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = user.RewrapResourcePayload(t.Context(), "vault:one", "config", input); err == nil || calls != 3 {
+		t.Fatal("denied rewrap was accepted or retried")
+	}
+}
 
 func TestControlClientUsesSecretWithoutBearer(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -23,6 +122,64 @@ func TestControlClientUsesSecretWithoutBearer(t *testing.T) {
 	resource, err := client.Resource(t.Context(), "vault:one")
 	if err != nil || resource.Resource != "vault:one" || resource.Revision != 2 {
 		t.Fatalf("resource=%+v err=%v", resource, err)
+	}
+}
+
+func TestControlClientReadsTypedEncryptionAndCatalogBinding(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"resource":"service_account:worker","principal_subject":"resource_principal:global","encryption":{"required":true,"status":"ready","key_scope":"organization","effective_key_resource":"organization:acme","key_resource":"organization:acme","key_version":3},"catalog_binding":{"resource":"service_account:worker","catalog_id":"cat","snapshot_id":"snap","snapshot_digest":"digest","entry_kinds":["api.operation"],"resource_revision":4}}`))
+	}))
+	defer server.Close()
+	client, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "client", SecretKey: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resource, err := client.Resource(t.Context(), "service_account:worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resource.PrincipalSubject != "resource_principal:global" || !resource.Encryption.Required || resource.Encryption.KeyVersion != 3 || resource.Encryption.EffectiveKeyResource != "organization:acme" || resource.Encryption.KeyResource != "organization:acme" {
+		t.Fatalf("missing principal/encryption fields: %+v", resource)
+	}
+	if resource.CatalogBinding == nil || resource.CatalogBinding.Resource != resource.Resource || resource.CatalogBinding.SnapshotID != "snap" || resource.CatalogBinding.ResourceRevision != 4 {
+		t.Fatalf("missing binding fields: %+v", resource.CatalogBinding)
+	}
+	var plain Resource
+	if err = json.Unmarshal([]byte(`{"encryption":{"required":false,"status":"not_required"}}`), &plain); err != nil || plain.CatalogBinding != nil || plain.Encryption.Required || plain.Encryption.KeyVersion != 0 {
+		t.Fatalf("plain resource invented encryption/binding: %+v, %v", plain, err)
+	}
+}
+
+func TestControlClientForUserDoesNotMutateApplicationClient(t *testing.T) {
+	var authorizations []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Lotor-Secret-Key") != "test-secret" {
+			t.Error("missing application credential")
+		}
+		authorizations = append(authorizations, r.Header.Get("Authorization"))
+		_, _ = w.Write([]byte(`{"resource":"vault:one"}`))
+	}))
+	defer server.Close()
+	application, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "client", SecretKey: "test-secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := application.ForUser("user-session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, client := range []*ControlClient{user, application, user} {
+		if _, err = client.Resource(t.Context(), "vault:one"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(authorizations) != 3 || authorizations[0] != "Bearer user-session" || authorizations[1] != "" || authorizations[2] != "Bearer user-session" {
+		t.Fatalf("principal isolation failed: %v", authorizations)
+	}
+	for _, token := range []string{"", " ", "a\nb", "a\rb"} {
+		if _, err = application.ForUser(token); err == nil {
+			t.Error("invalid user token accepted")
+		}
 	}
 }
 
