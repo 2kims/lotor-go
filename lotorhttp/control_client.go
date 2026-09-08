@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ControlClient calls the public Control API as an application adapter. Its
@@ -20,6 +21,7 @@ type ControlClient struct {
 	baseURL    string
 	clientID   string
 	secretKey  string
+	userToken  string
 }
 
 type ControlClientOptions struct {
@@ -42,16 +44,35 @@ type ResourceRegistration struct {
 }
 
 type Resource struct {
-	ID                  string          `json:"id"`
-	Resource            string          `json:"resource"`
-	ResourceType        string          `json:"resource_type"`
-	DisplayName         string          `json:"display_name"`
-	Parent              string          `json:"parent,omitempty"`
-	Status              string          `json:"status"`
-	Encryption          json.RawMessage `json:"encryption"`
-	CatalogBinding      json.RawMessage `json:"catalog_binding,omitempty"`
-	Revision            int64           `json:"revision"`
-	LifecycleGeneration int64           `json:"lifecycle_generation"`
+	CatalogBinding      *ResourceCatalogBinding `json:"catalog_binding,omitempty"`
+	ID                  string                  `json:"id"`
+	Resource            string                  `json:"resource"`
+	ResourceType        string                  `json:"resource_type"`
+	DisplayName         string                  `json:"display_name"`
+	Parent              string                  `json:"parent,omitempty"`
+	Status              string                  `json:"status"`
+	PrincipalSubject    string                  `json:"principal_subject,omitempty"`
+	Encryption          ResourceEncryption      `json:"encryption"`
+	Revision            int64                   `json:"revision"`
+	LifecycleGeneration int64                   `json:"lifecycle_generation"`
+}
+
+type ResourceEncryption struct {
+	Status               string `json:"status"`
+	KeyScope             string `json:"key_scope,omitempty"`
+	EffectiveKeyResource string `json:"effective_key_resource,omitempty"`
+	KeyResource          string `json:"key_resource,omitempty"`
+	KeyVersion           int64  `json:"key_version,omitempty"`
+	Required             bool   `json:"required"`
+}
+
+type ResourceCatalogBinding struct {
+	Resource         string   `json:"resource"`
+	CatalogID        string   `json:"catalog_id"`
+	SnapshotID       string   `json:"snapshot_id"`
+	SnapshotDigest   string   `json:"snapshot_digest"`
+	EntryKinds       []string `json:"entry_kinds"`
+	ResourceRevision int64    `json:"resource_revision"`
 }
 
 type DurableOperation struct {
@@ -64,6 +85,11 @@ type DurableOperation struct {
 	ErrorCode   string `json:"error_code,omitempty"`
 	CreatedAt   int64  `json:"created_at"`
 	UpdatedAt   int64  `json:"updated_at"`
+}
+
+type OperationWaitOptions struct {
+	MaxAttempts int
+	Interval    time.Duration
 }
 
 type ResourceCredentialMetadata struct {
@@ -121,6 +147,20 @@ func NewControlClient(options ControlClientOptions) (*ControlClient, error) {
 	return &ControlClient{baseURL: base, clientID: clientID, secretKey: secret, httpClient: &isolatedClient}, nil
 }
 
+// ForUser returns a separate client acting with the supplied user's permissions.
+// The application secret still selects the application/environment but does not
+// elevate the user. Invalid sessions fail closed; privileged application-only
+// methods will be rejected. The original application client is unchanged.
+func (c *ControlClient) ForUser(accessToken string) (*ControlClient, error) {
+	accessToken = strings.TrimSpace(accessToken)
+	if accessToken == "" || strings.ContainsAny(accessToken, "\r\n") {
+		return nil, errors.New("user access token is required and must not contain line breaks")
+	}
+	delegated := *c
+	delegated.userToken = accessToken
+	return &delegated, nil
+}
+
 func (c *ControlClient) Resource(ctx context.Context, resource string) (Resource, error) {
 	var out Resource
 	err := c.request(ctx, http.MethodGet, "/resources/"+url.PathEscape(requiredControl(resource, "resource")), "", nil, &out)
@@ -167,36 +207,95 @@ func (c *ControlClient) Operation(ctx context.Context, id string) (DurableOperat
 	return c.operationRequest(ctx, http.MethodGet, "/operations/"+url.PathEscape(requiredControl(id, "operation ID")), "", nil)
 }
 
-func (c *ControlClient) PutResourceType(ctx context.Context, resourceType string, definition any) (json.RawMessage, error) {
-	var out json.RawMessage
+func (c *ControlClient) WaitForOperation(ctx context.Context, id string, options OperationWaitOptions) (DurableOperation, error) {
+	maxAttempts := options.MaxAttempts
+	if maxAttempts == 0 {
+		maxAttempts = 120
+	}
+	interval := options.Interval
+	if interval == 0 {
+		interval = 500 * time.Millisecond
+	}
+	if maxAttempts < 1 || maxAttempts > 10000 || interval < 0 || interval > time.Minute {
+		return DurableOperation{}, errors.New("invalid operation wait options")
+	}
+	for attempt := range maxAttempts {
+		if err := ctx.Err(); err != nil {
+			return DurableOperation{}, err
+		}
+		operation, err := c.Operation(ctx, id)
+		if err != nil {
+			return DurableOperation{}, err
+		}
+		switch operation.Status {
+		case "succeeded", "failed", "cancelled":
+			return operation, nil
+		case "pending", "running":
+		default:
+			return DurableOperation{}, errors.New("invalid Lotor operation status")
+		}
+		if attempt+1 < maxAttempts {
+			timer := time.NewTimer(interval)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return DurableOperation{}, ctx.Err()
+			case <-timer.C:
+			}
+		}
+	}
+	return DurableOperation{}, errors.New("Lotor operation exceeded max attempts")
+}
+
+func (c *ControlClient) PutResourceType(ctx context.Context, resourceType string, definition ResourceTypeDefinition) (ResourceTypeDefinition, error) {
+	if definition.AllowedParentTypes == nil {
+		definition.AllowedParentTypes = []string{}
+	}
+	if definition.Relations == nil {
+		definition.Relations = []string{}
+	}
+	if definition.Payload.Slots == nil {
+		definition.Payload.Slots = []ResourcePayloadSlotPolicy{}
+	}
+	var out ResourceTypeDefinition
 	err := c.request(ctx, http.MethodPut, "/resource-types/"+url.PathEscape(requiredControl(resourceType, "resource type")), "", definition, &out)
 	return out, err
 }
 
-func (c *ControlClient) CreateCatalog(ctx context.Context, input any, key string) (json.RawMessage, error) {
-	var out json.RawMessage
+func (c *ControlClient) CreateCatalog(ctx context.Context, input CatalogCreation, key string) (Catalog, error) {
+	var out Catalog
 	err := c.request(ctx, http.MethodPost, "/catalogs", key, input, &out)
 	return out, err
 }
 
-func (c *ControlClient) Catalog(ctx context.Context, id string) (json.RawMessage, error) {
-	var out json.RawMessage
+func (c *ControlClient) Catalog(ctx context.Context, id string) (Catalog, error) {
+	var out Catalog
 	err := c.request(ctx, http.MethodGet, "/catalogs/"+url.PathEscape(requiredControl(id, "catalog ID")), "", nil, &out)
 	return out, err
 }
 
-func (c *ControlClient) Catalogs(ctx context.Context, cursor string, limit int) (json.RawMessage, error) {
-	var out json.RawMessage
+func (c *ControlClient) Catalogs(ctx context.Context, cursor string, limit int) (CatalogList, error) {
+	var out CatalogList
 	err := c.request(ctx, http.MethodGet, "/catalogs"+pagination(cursor, limit), "", nil, &out)
 	return out, err
 }
 
-func (c *ControlClient) ImportOpenAPI(ctx context.Context, catalogID string, input any, key string) (DurableOperation, error) {
+func (c *ControlClient) ImportOpenAPI(ctx context.Context, catalogID string, input CatalogImportInput, key string) (DurableOperation, error) {
 	return c.operationRequest(ctx, http.MethodPost, "/catalogs/"+url.PathEscape(requiredControl(catalogID, "catalog ID"))+"/imports", key, input)
 }
 
-func (c *ControlClient) CatalogSnapshots(ctx context.Context, catalogID, cursor string, limit int) (json.RawMessage, error) {
-	var out json.RawMessage
+func (c *ControlClient) ImportDefinitions(ctx context.Context, catalogID string, entries []GenericCatalogDefinition, key string) (DurableOperation, error) {
+	source, err := json.Marshal(struct {
+		Entries []GenericCatalogDefinition `json:"entries"`
+	}{Entries: entries})
+	if err != nil {
+		return DurableOperation{}, err
+	}
+	return c.operationRequest(ctx, http.MethodPost, "/catalogs/"+url.PathEscape(requiredControl(catalogID, "catalog ID"))+"/imports", key, CatalogImportInput{Format: "definitions_v1", SourceDocument: string(source)})
+}
+
+func (c *ControlClient) CatalogSnapshots(ctx context.Context, catalogID, cursor string, limit int) (CatalogSnapshotList, error) {
+	var out CatalogSnapshotList
 	err := c.request(ctx, http.MethodGet, "/catalogs/"+url.PathEscape(requiredControl(catalogID, "catalog ID"))+"/snapshots"+pagination(cursor, limit), "", nil, &out)
 	return out, err
 }
@@ -205,19 +304,19 @@ func (c *ControlClient) PublishCatalogSnapshot(ctx context.Context, catalogID, s
 	return c.operationRequest(ctx, http.MethodPost, "/catalogs/"+url.PathEscape(requiredControl(catalogID, "catalog ID"))+"/snapshots/"+url.PathEscape(requiredControl(snapshotID, "snapshot ID"))+"/publish", key, nil)
 }
 
-func (c *ControlClient) CatalogEntries(ctx context.Context, catalogID, cursor string, limit int) (json.RawMessage, error) {
-	var out json.RawMessage
+func (c *ControlClient) CatalogEntries(ctx context.Context, catalogID, cursor string, limit int) (CatalogEntryList, error) {
+	var out CatalogEntryList
 	err := c.request(ctx, http.MethodGet, "/catalogs/"+url.PathEscape(requiredControl(catalogID, "catalog ID"))+"/entries"+pagination(cursor, limit), "", nil, &out)
 	return out, err
 }
 
-func (c *ControlClient) CatalogEntry(ctx context.Context, catalogID, entryID string) (json.RawMessage, error) {
-	var out json.RawMessage
+func (c *ControlClient) CatalogEntry(ctx context.Context, catalogID, entryID string) (CatalogEntry, error) {
+	var out CatalogEntry
 	err := c.request(ctx, http.MethodGet, "/catalogs/"+url.PathEscape(requiredControl(catalogID, "catalog ID"))+"/entries/"+url.PathEscape(requiredControl(entryID, "entry ID")), "", nil, &out)
 	return out, err
 }
 
-func (c *ControlClient) BindResourceCatalog(ctx context.Context, resource string, input any, key string) (DurableOperation, error) {
+func (c *ControlClient) BindResourceCatalog(ctx context.Context, resource string, input ResourceCatalogBindingInput, key string) (DurableOperation, error) {
 	return c.operationRequest(ctx, http.MethodPut, "/resources/"+url.PathEscape(requiredControl(resource, "resource"))+"/catalog-binding", key, input)
 }
 
@@ -274,6 +373,46 @@ func (c *ControlClient) CommitResourcePayload(ctx context.Context, resource, slo
 	return out, err
 }
 
+// ResourcePayloadRewrapInput preserves key and lifecycle fences. Browser custody
+// supplies the optional attestation fields; box custody leaves them empty.
+type ResourcePayloadRewrapInput struct {
+	KeyBindingRef        string `json:"key_binding_ref"`
+	WrappedPayloadKey    string `json:"wrapped_payload_key,omitempty"`
+	RewrapperSubject     string `json:"rewrapper_subject,omitempty"`
+	RewrapperKeyID       string `json:"rewrapper_key_id,omitempty"`
+	RewrapReceipt        string `json:"rewrap_receipt,omitempty"`
+	PayloadVersion       int64  `json:"payload_version"`
+	ExpectedWrapRevision int64  `json:"expected_wrap_revision"`
+	PreviousKeyVersion   int64  `json:"previous_key_version"`
+	KeyVersion           int64  `json:"key_version"`
+	ResourceRevision     int64  `json:"resource_revision"`
+	LifecycleGeneration  int64  `json:"lifecycle_generation"`
+}
+
+type ResourcePayloadRewrapResult struct {
+	Resource            string `json:"resource"`
+	Slot                string `json:"slot"`
+	KeyBindingRef       string `json:"key_binding_ref"`
+	WrappedPayloadKey   string `json:"wrapped_payload_key"`
+	AADHash             string `json:"aad_hash"`
+	RewrapperSubject    string `json:"rewrapper_subject"`
+	RewrapperKeyID      string `json:"rewrapper_key_id"`
+	PayloadVersion      int64  `json:"payload_version"`
+	WrapRevision        int64  `json:"wrap_revision"`
+	PreviousKeyVersion  int64  `json:"previous_key_version"`
+	KeyVersion          int64  `json:"key_version"`
+	ResourceRevision    int64  `json:"resource_revision"`
+	LifecycleGeneration int64  `json:"lifecycle_generation"`
+}
+
+// RewrapResourcePayload changes the wrapped payload key through the configured
+// custody service without downloading or re-encrypting the stored object.
+func (c *ControlClient) RewrapResourcePayload(ctx context.Context, resource, slot string, input ResourcePayloadRewrapInput) (ResourcePayloadRewrapResult, error) {
+	var out ResourcePayloadRewrapResult
+	err := c.request(ctx, http.MethodPost, resourcePayloadPath(resource, slot)+"/rewraps", "", input, &out)
+	return out, err
+}
+
 func (c *ControlClient) DeleteResourcePayload(ctx context.Context, resource, slot, key string) (ResourcePayloadMutation, error) {
 	var out ResourcePayloadMutation
 	err := c.request(ctx, http.MethodDelete, resourcePayloadPath(resource, slot), key, nil, &out)
@@ -310,6 +449,9 @@ func (c *ControlClient) requestHeaders(ctx context.Context, method, path, key st
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Lotor-Secret-Key", c.secretKey)
+	if c.userToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.userToken)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
