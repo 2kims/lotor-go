@@ -6,6 +6,11 @@ are called out explicitly.
 
 ## Unreleased
 
+- Require a separately bound canonical provider query in resource execution
+  preflight and reject a response that changes any request field.
+- Relay browser-user execution through the same-origin adapter while retaining
+  its short-lived capability in a scoped HttpOnly cookie.
+
 - Add bounded, context-cancellable durable-operation polling to the Control
   client. Failed and cancelled operations are returned for caller handling;
   mutations are never retried.

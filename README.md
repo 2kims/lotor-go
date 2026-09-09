@@ -241,20 +241,28 @@ if err != nil {
 }
 
 preflight, err := workload.PreflightExecution(ctx, "integration:slack", lotorhttp.ResourceExecutionRequest{
-    Method: "POST", Path: "/chat.postMessage", ContentType: "application/json",
+    Method: "POST", Path: "/chat.postMessage", Query: "channel=C123", ContentType: "application/json",
     RequestBodyDigest: bodySHA256, RequestBodySize: int64(len(body)),
 })
 if err != nil {
     return err
 }
-authorization, err := workload.CommitExecution(ctx, "integration:slack", preflight)
+authorization, err := workload.CommitExecution(ctx, "integration:slack", preflight, lotorhttp.ResourceExecutionCommitInput{})
 ```
 
-The preflight token is server-issued, short-lived, and also serves as the
+`Query` is the canonical encoded query without `?`; use `url.Values.Encode()`
+and pass an empty string when no query exists. It is bound separately from the
+Catalog operation path. The preflight token is server-issued, short-lived, and also serves as the
 commit idempotency identity. There is no plan ID or caller-generated execution
 idempotency key. Commit revalidates the resource, credential, Catalog entry,
 payload, policy, and custody revisions before returning authorization evidence.
 It never returns a custody endpoint or provider credential bytes.
+
+The browser adapter also relays browser-user execution preflight and commit. It
+converts the preflight response header into a 30-second, path-scoped HttpOnly
+SameSite=Strict cookie and supplies that capability on commit without exposing
+it to JavaScript. Server and CLI workloads continue to use a Lotor-issued
+resource credential with the Go client.
 
 ## Verify application-gateway assertions
 

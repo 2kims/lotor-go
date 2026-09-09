@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "f012a46ae3f15b7a9a57b31bd94c3e392b3aa16e",
+  "source_commit": "31c99bc5c70617b5995abcde752e4fe1d4674f51",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -13,7 +13,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "18017834a16a6f76d06c22b9fd315b9224796a58c643f0d0b004379fc776fdd4"
+      "sha256": "8280c96a67349ab134bc27f98d1c72de479e67632f078ded4aa91ff3ceeadd22"
     },
     {
       "path": "examples/basic/main.go",
@@ -93,11 +93,15 @@
     },
     {
       "path": "lotorhttp/browseradapter/adapter.go",
-      "sha256": "31f1b2af1ad0d96568b2aff9702826011c6c07226fa8d6105e777c4d938036bb"
+      "sha256": "775ded92244c73d2bc79f69cd72c8c3243a48114a1316790abbdd1c093a6f113"
     },
     {
       "path": "lotorhttp/browseradapter/catalog_test.go",
       "sha256": "1a3f3226f4b425a625b1c13a6ca347e021316c138d7a8f5d6128ae7f76aa126b"
+    },
+    {
+      "path": "lotorhttp/browseradapter/execution_test.go",
+      "sha256": "6097563d0b532429a5b058a5669c4ef2ad15a11dffa7546b2a1201ee5567a1bf"
     },
     {
       "path": "lotorhttp/browseradapter/organization_relay_test.go",
@@ -117,7 +121,7 @@
     },
     {
       "path": "lotorhttp/browseradapter/resources.go",
-      "sha256": "a1444caadce93ee4446199a25a71c8ce01832d3f5de8ce5b8cd4b3734428436d"
+      "sha256": "e524fe80260ed5d0c49d717707c1fc32c680fc3dd889bb40b473ed79c98dbc10"
     },
     {
       "path": "lotorhttp/browseradapter/scim_test.go",
@@ -197,11 +201,11 @@
     },
     {
       "path": "lotorhttp/resource_client_test.go",
-      "sha256": "21ace8fa12647e1375e9fc9b323465463f7e7554e269e5d70e0d4d0e559af9c8"
+      "sha256": "92f79e6957327fc7e55fb90f09cef42fb6598952360c6a64f44321a85de70afd"
     },
     {
       "path": "lotorhttp/resource_client.go",
-      "sha256": "d2acdef3855f571fe28d2883a977b312541a030dfdbe4ad785d56fa55e959557"
+      "sha256": "a41e5d73fcd77cc79f5d50391b295acc66c375abf1a7eedaeaea48f85fd388a9"
     },
     {
       "path": "lotorhttp/resource_links_test.go",
@@ -249,7 +253,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "fd83ca0bfccd98d3fba6b90f8914248ad26a7cfaaa28cbb87e2820eacf0dc20e"
+      "sha256": "52b3269f4ad33b5d6c8cf788667826afd939b1b5c8446646fcc3bb9327653747"
     },
     {
       "path": "scripts/check-consumer.sh",

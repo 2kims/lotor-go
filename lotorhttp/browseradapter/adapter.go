@@ -32,9 +32,10 @@ type Adapter struct {
 }
 
 const (
-	prefix        = "/.lotor/v1"
-	bodyLimit     = 64 << 10
-	responseLimit = 4 << 20
+	prefix             = "/.lotor/v1"
+	bodyLimit          = 64 << 10
+	executionBodyLimit = 4 << 20
+	responseLimit      = 4 << 20
 )
 
 var clientIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,256}$`)
@@ -146,11 +147,15 @@ func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(401)
 		return
 	}
-	if r.ContentLength > bodyLimit {
+	requestBodyLimit := int64(bodyLimit)
+	if nativeResource && strings.HasSuffix(path, "/executions/commit") {
+		requestBodyLimit = executionBodyLimit
+	}
+	if r.ContentLength > requestBodyLimit {
 		fail(413)
 		return
 	}
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, bodyLimit))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, requestBodyLimit))
 	if err != nil {
 		fail(413)
 		return
@@ -190,6 +195,14 @@ func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		remote.Header.Set("Lotor-Payload-Token", token)
+	}
+	if nativeResource && strings.HasSuffix(path, "/executions/commit") {
+		token := cookieValue(r, "lotor_execution_token")
+		if !validValue(token) {
+			fail(401)
+			return
+		}
+		remote.Header.Set("Lotor-Execution-Token", token)
 	}
 	// Browser resource requests carry only end-user authority. The issued
 	// publishable key and session are scope-checked together by remote Lotor.
@@ -270,6 +283,17 @@ func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		cookie := a.cookie("lotor_payload_token", token, strings.TrimSuffix(r.URL.EscapedPath(), "/uploads"), true, false)
 		cookie.MaxAge = 300
 		cookie.Expires = time.Now().Add(5 * time.Minute)
+		http.SetCookie(w, cookie)
+	}
+	if nativeResource && strings.HasSuffix(path, "/executions/preflight") {
+		token := response.Header.Get("Lotor-Execution-Token")
+		if !validValue(token) || (&http.Cookie{Name: "lotor_execution_token", Value: token}).Valid() != nil {
+			fail(502)
+			return
+		}
+		cookie := a.cookie("lotor_execution_token", token, strings.TrimSuffix(r.URL.EscapedPath(), "/preflight"), true, false)
+		cookie.MaxAge = 30
+		cookie.Expires = time.Now().Add(30 * time.Second)
 		http.SetCookie(w, cookie)
 	}
 	w.Header().Set("Content-Type", "application/json")

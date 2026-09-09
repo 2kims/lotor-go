@@ -61,6 +61,7 @@ func NewResourceClient(options ResourceClientOptions) (*ResourceClient, error) {
 type ResourceExecutionRequest struct {
 	Method            string `json:"method"`
 	Path              string `json:"path"`
+	Query             string `json:"query"`
 	ContentType       string `json:"content_type"`
 	RequestBodyDigest string `json:"request_body_digest"`
 	RequestBodySize   int64  `json:"request_body_size"`
@@ -99,6 +100,7 @@ type ResourceExecutionPreflight struct {
 	PolicyRevision        string `json:"policy_revision"`
 	Resource              string `json:"resource"`
 	Path                  string `json:"path"`
+	Query                 string `json:"query"`
 	ContentType           string `json:"content_type"`
 	RequestBodyDigest     string `json:"request_body_digest"`
 	Token                 string `json:"-"`
@@ -114,7 +116,6 @@ type ResourceExecutionPreflight struct {
 	PayloadRepresentation string `json:"payload_representation"`
 	RequestFingerprint    string `json:"request_fingerprint"`
 	PayloadVersion        int64  `json:"payload_version"`
-	CredentialVersion     int64  `json:"credential_version"`
 	KeyVersion            int64  `json:"key_version,omitempty"`
 	LifecycleGeneration   int64  `json:"lifecycle_generation"`
 	ResourceRevision      int64  `json:"resource_revision"`
@@ -151,10 +152,19 @@ func (c *ResourceClient) PreflightExecution(ctx context.Context, resource string
 	if out.Token == "" {
 		return ResourceExecutionPreflight{}, errors.New("Lotor execution preflight omitted its token")
 	}
+	if out.Resource != resource || out.Method != input.Method || out.Path != input.Path || out.Query != input.Query || out.ContentType != input.ContentType || out.RequestBodyDigest != input.RequestBodyDigest || out.RequestBodySize != input.RequestBodySize {
+		return ResourceExecutionPreflight{}, errors.New("Lotor execution preflight did not match its request")
+	}
 	return out, nil
 }
 
 func (c *ResourceClient) CommitExecution(ctx context.Context, resource string, preflight ResourceExecutionPreflight, input ResourceExecutionCommitInput) (ResourceExecutionAuthorization, error) {
+	encrypted := preflight.PayloadRepresentation == "encrypted-envelope-v1"
+	if preflight.Resource != resource ||
+		(!encrypted && (preflight.PayloadRepresentation != "raw" || input.ProtectedRequest != "" || input.ResponsePolicyRef != "")) ||
+		(encrypted && (input.ProtectedRequest == "" || input.ResponsePolicyRef != preflight.ResponsePolicyRef)) {
+		return ResourceExecutionAuthorization{}, errors.New("execution commit does not match preflight")
+	}
 	var out ResourceExecutionAuthorization
 	_, err := c.request(ctx, http.MethodPost, resourcePath(resource)+"/executions/commit", http.Header{
 		"Lotor-Execution-Token": []string{requiredControl(preflight.Token, "execution token")},
@@ -163,12 +173,19 @@ func (c *ResourceClient) CommitExecution(ctx context.Context, resource string, p
 		ProtectedRequest   string `json:"protected_request,omitempty"`
 		ResponsePolicyRef  string `json:"response_policy_ref,omitempty"`
 	}{preflight.RequestFingerprint, input.ProtectedRequest, input.ResponsePolicyRef}, &out)
+	if err == nil && (out.RequestFingerprint != preflight.RequestFingerprint || out.Resource != preflight.Resource || out.CatalogEntryID != preflight.CatalogEntryID || out.PayloadSlot != preflight.PayloadSlot || out.PayloadVersion != preflight.PayloadVersion || out.PayloadRepresentation != preflight.PayloadRepresentation || out.ExecutionMode != preflight.ExecutionMode || out.ExpiresAt != preflight.ExpiresAt) {
+		return ResourceExecutionAuthorization{}, errors.New("Lotor execution authorization did not match preflight")
+	}
 	return out, err
 }
 
 type ProviderPlainRequest struct {
-	Headers map[string]string `json:"headers"`
-	Body    []byte            `json:"body"`
+	Method      string            `json:"method"`
+	Path        string            `json:"path"`
+	Query       string            `json:"query"`
+	ContentType string            `json:"content_type"`
+	Headers     map[string]string `json:"headers"`
+	Body        []byte            `json:"body"`
 }
 
 type ProviderProtectedResponse struct {
@@ -186,6 +203,9 @@ func ProtectProviderRequest(resourceKey []byte, preflight ResourceExecutionPrefl
 	}
 	if preflight.PayloadRepresentation != "encrypted-envelope-v1" || preflight.ResponsePolicyRef != "encrypt_all" || preflight.RequestAAD == "" {
 		return "", errors.New("execution preflight is not encrypted")
+	}
+	if input.Method != preflight.Method || input.Path != preflight.Path || input.Query != preflight.Query || input.ContentType != preflight.ContentType {
+		return "", errors.New("provider request metadata does not match execution preflight")
 	}
 	aad, err := base64.RawURLEncoding.DecodeString(preflight.RequestAAD)
 	if err != nil || len(aad) == 0 {
