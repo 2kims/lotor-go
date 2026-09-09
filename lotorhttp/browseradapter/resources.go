@@ -93,6 +93,9 @@ func resourceRoute(method, escapedPath string) bool {
 		return (len(parts) == 4 && (method == "GET" || method == "DELETE")) ||
 			(len(parts) == 5 && method == "POST" && slices.Contains([]string{"uploads", "commits", "access", "rewraps"}, parts[4]))
 	}
+	if parts[2] == "executions" && len(parts) == 4 && (parts[3] == "preflight" || parts[3] == "commit") {
+		return method == "POST"
+	}
 	if len(parts) == 3 && parts[2] == "e2ee" {
 		return method == "GET" || method == "PUT"
 	}

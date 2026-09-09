@@ -59,8 +59,31 @@ func TestPayloadStorageDoesNotUseAmbientCookiesOrCredentialHeaders(t *testing.T)
 	}
 }
 
+func TestResourceExecutionCommitRejectsMismatchedPreflightAndResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"authorized","request_fingerprint":"` + strings.Repeat("b", 64) + `","resource":"integration:slack","catalog_entry_id":"entry","payload_slot":"provider_credential","payload_version":1,"payload_representation":"raw","execution_mode":"raw","expires_at":100}`))
+	}))
+	defer server.Close()
+	client, err := NewResourceClient(ResourceClientOptions{BaseURL: server.URL, ClientID: "client", PublishableKey: "pk", ResourceCredential: "credential"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	preflight := ResourceExecutionPreflight{Token: strings.Repeat("t", 32), RequestFingerprint: strings.Repeat("a", 64), Resource: "integration:slack", CatalogEntryID: "entry", PayloadSlot: "provider_credential", PayloadVersion: 1, PayloadRepresentation: "raw", ExecutionMode: "raw", ExpiresAt: 100}
+	if _, err = client.CommitExecution(context.Background(), "integration:other", preflight, ResourceExecutionCommitInput{}); err == nil {
+		t.Fatal("accepted resource different from preflight")
+	}
+	if _, err = client.CommitExecution(context.Background(), "integration:slack", preflight, ResourceExecutionCommitInput{ResponsePolicyRef: "encrypt_all"}); err == nil {
+		t.Fatal("accepted encryption policy for raw execution")
+	}
+	if _, err = client.CommitExecution(context.Background(), "integration:slack", preflight, ResourceExecutionCommitInput{}); err == nil || !strings.Contains(err.Error(), "did not match preflight") {
+		t.Fatalf("mismatched response error=%v", err)
+	}
+}
+
 func TestResourceClientPreflightAndCommitUseProductionCredentialsAndOneToken(t *testing.T) {
 	requests := 0
+	digest := sha256.Sum256([]byte(`{}`))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
 		if r.Header.Get("Authorization") != "Bearer ltrc_test" || r.Header.Get("X-Lotor-Publishable-Key") != "pk_test" || r.Header.Get("X-Lotor-Secret-Key") != "" {
@@ -73,7 +96,11 @@ func TestResourceClientPreflightAndCommitUseProductionCredentialsAndOneToken(t *
 				t.Fatalf("path=%s", r.URL.Path)
 			}
 			w.Header().Set("Lotor-Execution-Token", "execution_token_abcdefghijklmnopqrstuvwxyz")
-			_, _ = w.Write([]byte(`{"request_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","resource":"integration:slack","resource_revision":2,"lifecycle_generation":1,"catalog_snapshot_id":"snapshot","catalog_entry_id":"entry","catalog_entry_revision":"revision","policy_revision":"policy","payload_slot":"provider_credential","payload_version":1,"payload_representation":"raw","credential_version":1,"execution_mode":"raw","expires_at":100}`))
+			var body ResourceExecutionRequest
+			if json.NewDecoder(r.Body).Decode(&body) != nil || body.Query != "channel=C123&limit=10" {
+				t.Fatalf("preflight query=%q", body.Query)
+			}
+			_, _ = w.Write([]byte(`{"request_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","resource":"integration:slack","resource_revision":2,"lifecycle_generation":1,"catalog_snapshot_id":"snapshot","catalog_entry_id":"entry","catalog_entry_revision":"revision","policy_revision":"policy","payload_slot":"provider_credential","payload_version":1,"payload_representation":"raw","execution_mode":"raw","method":"POST","path":"/messages","query":"channel=C123&limit=10","content_type":"application/json","request_body_digest":"` + hex.EncodeToString(digest[:]) + `","request_body_size":2,"expires_at":100}`))
 		case 2:
 			if r.Header.Get("Lotor-Execution-Token") != "execution_token_abcdefghijklmnopqrstuvwxyz" {
 				t.Fatalf("token=%q", r.Header.Get("Lotor-Execution-Token"))
@@ -86,9 +113,8 @@ func TestResourceClientPreflightAndCommitUseProductionCredentialsAndOneToken(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest := sha256.Sum256([]byte(`{}`))
-	preflight, err := client.PreflightExecution(t.Context(), "integration:slack", ResourceExecutionRequest{Method: "POST", Path: "/messages", ContentType: "application/json", RequestBodyDigest: hex.EncodeToString(digest[:]), RequestBodySize: 2})
-	if err != nil || preflight.Token == "" {
+	preflight, err := client.PreflightExecution(t.Context(), "integration:slack", ResourceExecutionRequest{Method: "POST", Path: "/messages", Query: "channel=C123&limit=10", ContentType: "application/json", RequestBodyDigest: hex.EncodeToString(digest[:]), RequestBodySize: 2})
+	if err != nil || preflight.Token == "" || preflight.Query != "channel=C123&limit=10" {
 		t.Fatalf("preflight=%+v error=%v", preflight, err)
 	}
 	authorization, err := client.CommitExecution(t.Context(), "integration:slack", preflight, ResourceExecutionCommitInput{})
@@ -137,23 +163,36 @@ func TestProviderExecutionProtectionRoundTripAndBinding(t *testing.T) {
 		RequestFingerprint: "fingerprint", Resource: "integration:slack", CatalogEntryID: "chat.postMessage",
 		PayloadSlot: "provider_credential", PayloadVersion: 3, ExecutionMode: "managed", ExpiresAt: 123,
 		PayloadRepresentation: "encrypted-envelope-v1", ResponsePolicyRef: "encrypt_all",
-		RequestAAD: base64.RawURLEncoding.EncodeToString(requestAAD), ContentType: "application/json",
+		RequestAAD: base64.RawURLEncoding.EncodeToString(requestAAD), Method: "POST", Path: "/messages", Query: "channel=C123", ContentType: "application/json",
 		RequestBodyDigest: hex.EncodeToString(requestBodyDigest[:]), RequestBodySize: int64(len(requestBody)),
 	}
-	protected, err := ProtectProviderRequest(key, preflight, ProviderPlainRequest{
+	request := ProviderPlainRequest{
+		Method: "POST", Path: "/messages", Query: "channel=C123", ContentType: "application/json",
 		Headers: map[string]string{"Content-Type": "application/json"}, Body: requestBody,
-	})
+	}
+	protected, err := ProtectProviderRequest(key, preflight, request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = ProtectProviderRequest(key, preflight, ProviderPlainRequest{Body: []byte("different")}); err == nil {
+	changed := request
+	changed.Body = []byte("different")
+	if _, err = ProtectProviderRequest(key, preflight, changed); err == nil {
 		t.Fatal("request body not matching preflight was accepted")
 	}
-	if _, err = ProtectProviderRequest(key, preflight, ProviderPlainRequest{Body: bytes.Repeat([]byte("a"), (1<<20)+1)}); err == nil {
+	changed = request
+	changed.Body = bytes.Repeat([]byte("a"), (1<<20)+1)
+	if _, err = ProtectProviderRequest(key, preflight, changed); err == nil {
 		t.Fatal("oversized provider body was accepted")
 	}
-	if _, err = ProtectProviderRequest(key, preflight, ProviderPlainRequest{Body: requestBody, Headers: map[string]string{"Accept": strings.Repeat("a", 8193)}}); err == nil {
+	changed = request
+	changed.Headers = map[string]string{"Accept": strings.Repeat("a", 8193)}
+	if _, err = ProtectProviderRequest(key, preflight, changed); err == nil {
 		t.Fatal("oversized provider header was accepted")
+	}
+	changed = request
+	changed.Query = "channel=other"
+	if _, err = ProtectProviderRequest(key, preflight, changed); err == nil {
+		t.Fatal("provider query not matching preflight was accepted")
 	}
 	plaintext, err := openExecutionPayload(key, protected, requestAAD)
 	if err != nil || !bytes.Contains(plaintext, []byte(`"headers"`)) || !bytes.Contains(plaintext, []byte(base64.RawURLEncoding.EncodeToString(requestBody))) {
