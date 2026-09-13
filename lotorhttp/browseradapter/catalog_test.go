@@ -10,6 +10,7 @@ func TestCatalogDiscoveryRouteBoundary(t *testing.T) {
 	}{
 		{"GET", "/me/catalogs", true},
 		{"GET", "/me/catalogs/cat_one/entries", true},
+		{"GET", "/me/catalogs/cat_one/snapshots/snap_one/document", true},
 		{"PUT", "/resources/vault:one/catalog-binding", true},
 		{"POST", "/me/catalogs", false},
 		{"GET", "/me/catalogs/cat_one/imports", false},

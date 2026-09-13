@@ -39,6 +39,13 @@ type PublishedCatalogEntryList struct {
 	CatalogEntryList
 }
 
+type CatalogSnapshotDocument struct {
+	CatalogID      string          `json:"catalog_id"`
+	SnapshotID     string          `json:"snapshot_id"`
+	DocumentDigest string          `json:"document_digest"`
+	Document       json.RawMessage `json:"document"`
+}
+
 type CatalogImportInput struct {
 	Format         string `json:"format"`
 	SourceDocument string `json:"source_document"`

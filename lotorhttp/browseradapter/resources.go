@@ -41,8 +41,12 @@ func resourceRoute(method, escapedPath string) bool {
 	if parts[0] == "operations" {
 		return len(parts) == 2 && method == "GET"
 	}
-	if parts[0] == "me" && len(parts) == 4 && parts[1] == "catalogs" {
-		return method == "GET" && parts[3] == "entries" && clientIDPattern.MatchString(parts[2])
+	if parts[0] == "me" && parts[1] == "catalogs" {
+		if len(parts) == 4 {
+			return method == "GET" && parts[3] == "entries" && clientIDPattern.MatchString(parts[2])
+		}
+		return len(parts) == 6 && method == "GET" && parts[3] == "snapshots" && parts[5] == "document" &&
+			clientIDPattern.MatchString(parts[2]) && clientIDPattern.MatchString(parts[4])
 	}
 	if parts[0] == "catalogs" && method == "GET" {
 		return (len(parts) == 3 && parts[2] == "entries") ||

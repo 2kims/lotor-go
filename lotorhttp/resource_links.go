@@ -237,11 +237,12 @@ type ResourceCollaboratorListOptions struct {
 }
 
 type ResourceSearchResourceFilters struct {
-	Search    string   `json:"search,omitempty"`
-	Resources []string `json:"resources,omitempty"`
-	Types     []string `json:"types,omitempty"`
-	Parent    string   `json:"parent,omitempty"`
-	Statuses  []string `json:"statuses,omitempty"`
+	References map[string]string `json:"references,omitempty"`
+	Search     string            `json:"search,omitempty"`
+	Resources  []string          `json:"resources,omitempty"`
+	Types      []string          `json:"types,omitempty"`
+	Parent     string            `json:"parent,omitempty"`
+	Statuses   []string          `json:"statuses,omitempty"`
 }
 type ResourceSearchCollaboratorFilters struct {
 	Direct          *bool    `json:"direct,omitempty"`
@@ -279,11 +280,12 @@ type ResourceSearchParent struct {
 	DisplayName  string `json:"display_name"`
 }
 type ResourceSearchResult struct {
+	Parent              *ResourceSearchParent  `json:"parent,omitempty"`
+	References          map[string]string      `json:"references,omitempty"`
 	Resource            string                 `json:"resource"`
 	ResourceType        string                 `json:"resource_type"`
 	DisplayName         string                 `json:"display_name"`
 	Status              string                 `json:"status"`
-	Parent              *ResourceSearchParent  `json:"parent,omitempty"`
 	CollaboratorMatches []ResourceCollaborator `json:"collaborator_matches,omitempty"`
 }
 type ResourceSearchList struct {
@@ -694,7 +696,7 @@ func validateResourceSearch(input ResourceSearchInput) error {
 		return errors.New("invalid resource search page")
 	}
 	for _, include := range input.Include {
-		if !oneOf(include, "parent", "collaborator_matches") {
+		if !oneOf(include, "parent", "collaborator_matches", "references") {
 			return errors.New("invalid resource search include")
 		}
 	}
@@ -722,6 +724,17 @@ func validateResourceSearch(input ResourceSearchInput) error {
 				if _, err := graphString(value, values.name, values.max); err != nil {
 					return err
 				}
+			}
+		}
+		if len(filter.References) > 16 {
+			return errors.New("resource references may contain at most 16 fields")
+		}
+		for field, target := range filter.References {
+			if _, err := graphString(field, "reference field", 128); err != nil {
+				return err
+			}
+			if _, err := graphString(target, "reference target", 512); err != nil {
+				return err
 			}
 		}
 	}

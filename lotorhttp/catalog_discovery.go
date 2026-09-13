@@ -18,3 +18,9 @@ func (c *ControlClient) AvailableCatalogEntries(ctx context.Context, catalogID, 
 	err := c.request(ctx, http.MethodGet, "/me/catalogs/"+url.PathEscape(requiredControl(catalogID, "catalog ID"))+"/entries"+pagination(cursor, limit), "", nil, &out)
 	return out, err
 }
+
+func (c *ControlClient) AvailableCatalogSnapshotDocument(ctx context.Context, catalogID, snapshotID string) (CatalogSnapshotDocument, error) {
+	var out CatalogSnapshotDocument
+	err := c.request(ctx, http.MethodGet, "/me/catalogs/"+url.PathEscape(requiredControl(catalogID, "catalog ID"))+"/snapshots/"+url.PathEscape(requiredControl(snapshotID, "snapshot ID"))+"/document", "", nil, &out)
+	return out, err
+}
