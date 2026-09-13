@@ -63,7 +63,7 @@ func TestControlResourceGraphWorkflow(t *testing.T) {
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"resource": "vault:one", "collaborators": []any{map[string]any{"kind": "service_account", "id": "service_account:deploy", "resource": "service_account:deploy", "relations": []string{"operator"}, "status": "active"}}, "next_cursor": "next"})
 		case r.URL.Path == "/v1/public/applications/app/resources/search":
-			_ = json.NewEncoder(w).Encode(map[string]any{"resources": []any{map[string]any{"resource": "vault:one", "resource_type": "vault", "display_name": "Vault", "status": "active", "parent": map[string]any{"resource": "project:one", "resource_type": "project", "display_name": "Project"}}}, "next_cursor": nil})
+			_ = json.NewEncoder(w).Encode(map[string]any{"resources": []any{map[string]any{"resource": "vault:one", "resource_type": "vault", "display_name": "Vault", "status": "active", "references": map[string]string{"environment": "environment:preview"}, "parent": map[string]any{"resource": "project:one", "resource_type": "project", "display_name": "Project"}}}, "next_cursor": nil})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -104,8 +104,8 @@ func TestControlResourceGraphWorkflow(t *testing.T) {
 	if err != nil || page.Collaborators[0].Kind != "service_account" {
 		t.Fatalf("collaborators=%+v err=%v", page, err)
 	}
-	resources, err := client.SearchResources(t.Context(), ResourceSearchInput{Filters: &ResourceSearchFilters{Resource: &ResourceSearchResourceFilters{Types: []string{"vault"}}}, Include: []string{"parent"}, Page: &ResourceSearchPage{Limit: 10}})
-	if err != nil || resources.Resources[0].Parent == nil || resources.Resources[0].Parent.Resource != "project:one" {
+	resources, err := client.SearchResources(t.Context(), ResourceSearchInput{Filters: &ResourceSearchFilters{Resource: &ResourceSearchResourceFilters{Types: []string{"vault"}, References: map[string]string{"environment": "environment:preview"}}}, Include: []string{"parent", "references"}, Page: &ResourceSearchPage{Limit: 10}})
+	if err != nil || resources.Resources[0].Parent == nil || resources.Resources[0].Parent.Resource != "project:one" || resources.Resources[0].References["environment"] != "environment:preview" {
 		t.Fatalf("resources=%+v err=%v", resources, err)
 	}
 	denied = true

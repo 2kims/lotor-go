@@ -296,3 +296,33 @@ func TestControlClientPayloadUploadCarriesOnlyServerIssuedPayloadToken(t *testin
 		t.Fatalf("manifest=%+v requests=%d error=%v", manifest, requests, err)
 	}
 }
+
+func TestResourceRegistrationPreservesReferenceIntent(t *testing.T) {
+	omitted, err := json.Marshal(ResourceRegistration{ResourceType: "api_key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var omittedWire map[string]any
+	if err = json.Unmarshal(omitted, &omittedWire); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := omittedWire["references"]; exists {
+		t.Fatalf("nil references must be omitted: %s", omitted)
+	}
+
+	explicit, err := json.Marshal(ResourceRegistration{ResourceType: "api_key", References: map[string]string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var explicitWire map[string]any
+	if err = json.Unmarshal(explicit, &explicitWire); err != nil {
+		t.Fatal(err)
+	}
+	value, exists := explicitWire["references"]
+	if !exists {
+		t.Fatalf("empty references must be explicit: %s", explicit)
+	}
+	if values, ok := value.(map[string]any); !ok || len(values) != 0 {
+		t.Fatalf("references=%T(%v), want empty object", value, value)
+	}
+}

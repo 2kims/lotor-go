@@ -37,14 +37,36 @@ type ResourceLifecycleFence struct {
 }
 
 type ResourceRegistration struct {
-	ResourceType string `json:"resource_type"`
-	DisplayName  string `json:"display_name,omitempty"`
-	Parent       string `json:"parent,omitempty"`
-	KeyScope     string `json:"key_scope,omitempty"`
+	References   map[string]string `json:"references,omitempty"`
+	ResourceType string            `json:"resource_type"`
+	DisplayName  string            `json:"display_name,omitempty"`
+	Parent       string            `json:"parent,omitempty"`
+	KeyScope     string            `json:"key_scope,omitempty"`
+}
+
+// MarshalJSON preserves the difference between an omitted reference map and
+// an explicitly supplied empty map. PUT uses omission to preserve immutable
+// references; an explicit map must equal the complete stored map.
+func (r ResourceRegistration) MarshalJSON() ([]byte, error) {
+	wire := map[string]any{"resource_type": r.ResourceType}
+	if r.DisplayName != "" {
+		wire["display_name"] = r.DisplayName
+	}
+	if r.Parent != "" {
+		wire["parent"] = r.Parent
+	}
+	if r.KeyScope != "" {
+		wire["key_scope"] = r.KeyScope
+	}
+	if r.References != nil {
+		wire["references"] = r.References
+	}
+	return json.Marshal(wire)
 }
 
 type Resource struct {
 	CatalogBinding      *ResourceCatalogBinding `json:"catalog_binding,omitempty"`
+	References          map[string]string       `json:"references,omitempty"`
 	ID                  string                  `json:"id"`
 	Resource            string                  `json:"resource"`
 	ResourceType        string                  `json:"resource_type"`

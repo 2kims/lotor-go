@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "31c99bc5c70617b5995abcde752e4fe1d4674f51",
+  "source_commit": "87ac4ee93f5dbda879a82a17358cf0d78f95c1f4",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -97,7 +97,7 @@
     },
     {
       "path": "lotorhttp/browseradapter/catalog_test.go",
-      "sha256": "1a3f3226f4b425a625b1c13a6ca347e021316c138d7a8f5d6128ae7f76aa126b"
+      "sha256": "a9a6cdd411543a2ea4d3ded19160c0fb15cab0fba9da0174cdf693ef7a5dfa2c"
     },
     {
       "path": "lotorhttp/browseradapter/execution_test.go",
@@ -121,7 +121,7 @@
     },
     {
       "path": "lotorhttp/browseradapter/resources.go",
-      "sha256": "e524fe80260ed5d0c49d717707c1fc32c680fc3dd889bb40b473ed79c98dbc10"
+      "sha256": "f95f03f2dfd243bf156a780d13652bd8f55364f57317af679d3f18c97b32670c"
     },
     {
       "path": "lotorhttp/browseradapter/scim_test.go",
@@ -129,11 +129,11 @@
     },
     {
       "path": "lotorhttp/catalog_discovery_test.go",
-      "sha256": "5c0d6d7db7bf1eb46713ca24ee577558b6420a27ed8c8ed89a0fbdb04df88fc8"
+      "sha256": "b28e71d95cfafeac4b322567763a15257a6de68230db5627dd22973c9517473d"
     },
     {
       "path": "lotorhttp/catalog_discovery.go",
-      "sha256": "ee51643a7347bc27562fa3497372141e56a1cfedce4e66b0e4b69d82e99a0187"
+      "sha256": "690f523727db014c4a615be50cf338c73a2d12f7b48eb24165fa2255dbcb9c55"
     },
     {
       "path": "lotorhttp/catalog_read_test.go",
@@ -149,15 +149,15 @@
     },
     {
       "path": "lotorhttp/catalog_types.go",
-      "sha256": "0f710782534a8e6178a91ebd6a70d5d016e3f22c6dafc0bcbcf64fde39ffd72f"
+      "sha256": "74a98cc191c8e1b14ea98c5463b086a43effeda90c72536fe37d35bb2b6ea1d8"
     },
     {
       "path": "lotorhttp/control_client_test.go",
-      "sha256": "685b0f4e1dccf411f25c7e82f4b934a2ade0d340607eb417fa787475281a7c61"
+      "sha256": "b9bc7cb3d4e5c8eac850314f4e2981967ab0746d347fa5adb158f3ca9c67c67e"
     },
     {
       "path": "lotorhttp/control_client.go",
-      "sha256": "de2afd8be59346b1700a4f91a9966d34e3de22f7927f536fe1daf330cf44b1f1"
+      "sha256": "491712958746daa57a37a82eff304bf87567c5045005e160effa2161bbb79848"
     },
     {
       "path": "lotorhttp/control_payload_read_test.go",
@@ -209,11 +209,11 @@
     },
     {
       "path": "lotorhttp/resource_links_test.go",
-      "sha256": "689b3337bc4e0975cba927d685c39b2839de80184c6d4c144a8e5baed4ff9f97"
+      "sha256": "452b5de375ccb1be33bad1248ef997976aa649f44dbf48bad5eeaf08135843dd"
     },
     {
       "path": "lotorhttp/resource_links.go",
-      "sha256": "738e4c881f3018641ae47b7d7f797a406d2b6b9b680333d2d0f5620513400f67"
+      "sha256": "5949742733f16f098d96d17aee63542dfd41761a8579b7dbaf965985bc013829"
     },
     {
       "path": "lotorhttp/resource_node_interop_test.go",
@@ -233,7 +233,7 @@
     },
     {
       "path": "lotorhttp/resource_type.go",
-      "sha256": "7291c33115cc396c884c744ce35557407abb56509f6218a34ace3c14640ff1fd"
+      "sha256": "b2c7894fd26da070ab286d5caebf88d45c2a654246cd41c3130f8f52807c786a"
     },
     {
       "path": "lotorhttp/runtime.go",
