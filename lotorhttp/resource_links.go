@@ -169,6 +169,15 @@ type ResourceLinkSendResult struct {
 	Committed ResourceLinkResult
 }
 
+// ResourceSubjectAccessCheck is the current effective-access decision for one
+// exact subject and one exact resource. It intentionally contains no graph,
+// relation, collaborator, or identity metadata.
+type ResourceSubjectAccessCheck struct {
+	Resource string `json:"resource"`
+	Subject  string `json:"subject"`
+	Allowed  bool   `json:"allowed"`
+}
+
 type UnlinkResult struct {
 	ID            string   `json:"id"`
 	Resource      string   `json:"resource"`
@@ -431,6 +440,33 @@ func (c *ControlClient) ResourceCollaborators(ctx context.Context, resource stri
 	return out, err
 }
 
+// CheckResourceSubjectAccess performs a server-to-server authorization check
+// using application authority. A delegated user client is rejected so a user
+// bearer token can never be confused with, or unnecessarily disclosed to, the
+// application-only decision endpoint.
+func (c *ControlClient) CheckResourceSubjectAccess(ctx context.Context, resource, subject string) (ResourceSubjectAccessCheck, error) {
+	var out ResourceSubjectAccessCheck
+	if err := c.requireApplicationAuthority(); err != nil {
+		return out, err
+	}
+	resource, err := graphString(resource, "resource", 512)
+	if err != nil {
+		return out, err
+	}
+	subject, err = graphSubject(subject)
+	if err != nil {
+		return out, err
+	}
+	input := struct {
+		Subject string `json:"subject"`
+	}{Subject: subject}
+	err = c.strictRequest(ctx, http.MethodPost, graphResourcePath(resource)+"/subject-access/check", "", nil, input, &out)
+	if err == nil && (out.Resource != resource || out.Subject != subject) {
+		err = errors.New("invalid Lotor subject access response")
+	}
+	return out, err
+}
+
 func (c *ControlClient) SearchResources(ctx context.Context, input ResourceSearchInput) (ResourceSearchList, error) {
 	var out ResourceSearchList
 	if err := c.requireResourceGraphUser(); err != nil {
@@ -477,6 +513,21 @@ func (c *ControlClient) requireResourceGraphUser() error {
 		return errors.New("resource collaboration requires ForUser delegation")
 	}
 	return nil
+}
+
+func (c *ControlClient) requireApplicationAuthority() error {
+	if c.userToken != "" {
+		return errors.New("operation requires application authority")
+	}
+	return nil
+}
+
+func graphSubject(value string) (string, error) {
+	value, err := graphString(value, "subject", 512)
+	if err != nil || strings.ContainsAny(value, " \t\r\n/?#") {
+		return "", errors.New("subject is invalid")
+	}
+	return value, nil
 }
 
 func graphString(value, name string, maximum int) (string, error) {
