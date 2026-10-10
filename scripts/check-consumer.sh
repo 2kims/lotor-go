@@ -78,6 +78,7 @@ type ControlGraph interface {
 	SendResourceLinks(context.Context, string, lotorhttp.ResourceLinkSendInput) (lotorhttp.ResourceLinkSendResult, error)
 	UnlinkResource(context.Context, string, string, string) (lotorhttp.UnlinkResult, error)
 	ResourceCollaborators(context.Context, string, lotorhttp.ResourceCollaboratorListOptions) (lotorhttp.ResourceCollaboratorList, error)
+	CheckResourceSubjectAccess(context.Context, string, string) (lotorhttp.ResourceSubjectAccessCheck, error)
 	SearchResources(context.Context, lotorhttp.ResourceSearchInput) (lotorhttp.ResourceSearchList, error)
 	OrganizationE2EEPolicy(context.Context, string) (lotorhttp.OrganizationE2EEPolicy, error)
 	ConfigureOrganizationE2EE(context.Context, string, lotorhttp.OrganizationE2EEPolicyInput) (lotorhttp.OrganizationE2EEPolicy, error)

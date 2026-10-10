@@ -149,6 +149,75 @@ func TestControlResourceGraphRejectsInvalidInputBeforeTransport(t *testing.T) {
 	}
 }
 
+func TestControlResourceSubjectAccessCheckUsesOnlyApplicationAuthority(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/public/applications/app/resources/vault:one/subject-access/check" {
+			t.Errorf("request=%s %s", r.Method, r.URL.EscapedPath())
+		}
+		if r.Header.Get("X-Lotor-Secret-Key") != "secret" {
+			t.Error("missing application secret")
+		}
+		if authorization := r.Header.Get("Authorization"); authorization != "" {
+			t.Errorf("delegated authority leaked: %q", authorization)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || !reflect.DeepEqual(body, map[string]any{"subject": "user:alice"}) {
+			t.Errorf("body=%v err=%v", body, err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"resource": "vault:one", "subject": "user:alice", "allowed": true,
+		})
+	}))
+	defer server.Close()
+
+	app, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "app", SecretKey: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := app.CheckResourceSubjectAccess(t.Context(), "vault:one", "user:alice")
+	if err != nil || !result.Allowed {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	delegated, err := app.ForUser("alice-session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = delegated.CheckResourceSubjectAccess(t.Context(), "vault:one", "user:alice"); err == nil {
+		t.Fatal("delegated client reached application-only endpoint")
+	}
+	if _, err = app.CheckResourceSubjectAccess(t.Context(), "vault:one", "bad subject"); err == nil {
+		t.Fatal("invalid subject reached transport")
+	}
+	if calls != 1 {
+		t.Fatalf("requests=%d want 1", calls)
+	}
+}
+
+func TestControlResourceSubjectAccessCheckRejectsMalformedResponse(t *testing.T) {
+	response := map[string]any{"resource": "vault:other", "subject": "user:alice", "allowed": true}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+	app, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "app", SecretKey: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = app.CheckResourceSubjectAccess(t.Context(), "vault:one", "user:alice"); err == nil {
+		t.Fatal("accepted mismatched resource")
+	}
+	response = map[string]any{"resource": "vault:one", "subject": "user:other", "allowed": true}
+	if _, err = app.CheckResourceSubjectAccess(t.Context(), "vault:one", "user:alice"); err == nil {
+		t.Fatal("accepted mismatched subject")
+	}
+	response = map[string]any{"resource": "vault:one", "subject": "user:alice", "allowed": true, "relations": []string{"owner"}}
+	if _, err = app.CheckResourceSubjectAccess(t.Context(), "vault:one", "user:alice"); err == nil {
+		t.Fatal("accepted undisclosed response field")
+	}
+}
+
 func TestControlResourceGraphRejectsMalformedAuthorityResponses(t *testing.T) {
 	response := graphLinkResult("ready", true)
 	includeToken := false

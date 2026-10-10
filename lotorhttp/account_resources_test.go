@@ -49,14 +49,14 @@ func TestAccountResourcesPreservesMemberDirectoryContract(t *testing.T) {
 			t.Error("lost user directory authority")
 		}
 		q := r.URL.Query()
-		if q.Get("parent") != "project:a/b" || q.Get("cursor") != "opaque+cursor" || q.Get("limit") != "2" || !reflect.DeepEqual(q["type"], []string{"vault", "api_key"}) || !reflect.DeepEqual(q["access_state"], []string{"active", "pending_encryption"}) {
+		if q.Get("parent") != "organization:root" || q.Get("cursor") != "opaque+cursor" || q.Get("limit") != "2" || !reflect.DeepEqual(q["type"], []string{"project", "vault"}) || !reflect.DeepEqual(q["access_state"], []string{"active", "pending_encryption"}) {
 			t.Errorf("lost filters: %v", q)
 		}
 		if requests > 1 {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
-		_, _ = w.Write([]byte(`{"resources":[{"id":"one","resource":"vault:one","type":"vault","name":"One","parent":{"id":"a/b","resource":"project:a/b","type":"project","name":"Parent"},"relations":["member"],"access_state":"pending_encryption","access":{"direct":false,"paths":[{"type":"group","relation":"member","via":[{"id":"team","resource":"group:team","type":"group","name":"Team","subject_relation":"member"}]}]}}],"next_cursor":null}`))
+		_, _ = w.Write([]byte(`{"resources":[{"id":"a/b","resource":"project:a/b","type":"project","name":"Parent","relations":[],"access_state":"active","access":{"direct":false,"paths":[{"type":"ancestor","relation":"member","via":[{"id":"one","resource":"vault:one","type":"vault","name":"One","subject_relation":"member"}]}]}}],"next_cursor":null}`))
 	}))
 	defer server.Close()
 	app, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "app", SecretKey: "secret"})
@@ -67,13 +67,13 @@ func TestAccountResourcesPreservesMemberDirectoryContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := AccountResourceListOptions{Parent: "project:a/b", Cursor: "opaque+cursor", Limit: 2, Types: []string{"vault", "api_key"}, AccessStates: []string{"active", "pending_encryption"}}
+	options := AccountResourceListOptions{Parent: "organization:root", Cursor: "opaque+cursor", Limit: 2, Types: []string{"project", "vault"}, AccessStates: []string{"active", "pending_encryption"}}
 	page, err := client.AccountResources(t.Context(), options)
 	if err != nil || len(page.Resources) != 1 || page.NextCursor != nil {
 		t.Fatalf("page=%+v err=%v", page, err)
 	}
 	resource := page.Resources[0]
-	if resource.Resource != "vault:one" || resource.Parent == nil || resource.Parent.Resource != "project:a/b" || resource.AccessState != "pending_encryption" || resource.Access.Direct || len(resource.Access.Paths) != 1 || len(resource.Access.Paths[0].Via) != 1 || resource.Access.Paths[0].Via[0].SubjectRelation != "member" {
+	if resource.Resource != "project:a/b" || resource.AccessState != "active" || resource.Access.Direct || len(resource.Access.Paths) != 1 || resource.Access.Paths[0].Type != "ancestor" || len(resource.Access.Paths[0].Via) != 1 || resource.Access.Paths[0].Via[0].Resource != "vault:one" || resource.Access.Paths[0].Via[0].SubjectRelation != "member" {
 		t.Fatalf("lost resource projection: %+v", resource)
 	}
 	if _, err = client.AccountResources(t.Context(), options); err == nil {
