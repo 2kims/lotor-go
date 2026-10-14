@@ -30,7 +30,13 @@ func TestTypedResourceTypePolicy(t *testing.T) {
 	}
 	input := ResourceTypeDefinition{
 		ResourceType: "vault", Kind: "container", Lifecycle: "application", KeyBehavior: "configurable", AllowedParentTypes: []string{"project"}, Relations: []string{"owner", "member"}, InheritedRelations: []string{"member"}, CatalogEntryKinds: []string{"api.operation"}, DirectLinks: true, MayActAsPrincipal: true,
-		Payload: ResourcePayloadTypePolicy{Storage: "lotor", Slots: []ResourcePayloadSlotPolicy{{Name: "content", SchemaIDs: []string{"avault.vault.v1"}, MaximumObjectSize: 1048576, Required: true}}},
+		Payload:          ResourcePayloadTypePolicy{Storage: "lotor", Slots: []ResourcePayloadSlotPolicy{{Name: "content", SchemaIDs: []string{"avault.vault.v1"}, MaximumObjectSize: 1048576, Required: true}}},
+		CredentialPolicy: &ResourceCredentialPolicy{ExecutionTargetReference: "connection", PrincipalReference: "worker", RequireParentAccess: true},
+		ReferenceFields: []ResourceReferenceFieldDefinition{
+			{Name: "connection", TargetResourceTypes: []string{"integration"}, Required: true, Constraints: &ResourceReferenceConstraints{AllowedTargetParents: []string{"source_parent"}, MatchingReferences: []string{"region"}, MatchingCatalogOf: "source_parent"}},
+			{Name: "region", TargetResourceTypes: []string{"deployment"}, Required: true},
+			{Name: "worker", TargetResourceTypes: []string{"service_account"}},
+		},
 	}
 	result, err := client.PutResourceType(t.Context(), "vault", input)
 	if err != nil || !reflect.DeepEqual(result, input) {

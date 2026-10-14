@@ -2,6 +2,7 @@ package lotorhttp
 
 // ResourceTypeDefinition declares the application-owned graph and payload policy.
 type ResourceTypeDefinition struct {
+	CredentialPolicy   *ResourceCredentialPolicy          `json:"credential_policy,omitempty"`
 	ReferenceFields    []ResourceReferenceFieldDefinition `json:"reference_fields,omitempty"`
 	ResourceType       string                             `json:"resource_type"`
 	Kind               string                             `json:"kind"`
@@ -18,9 +19,22 @@ type ResourceTypeDefinition struct {
 }
 
 type ResourceReferenceFieldDefinition struct {
-	Name                string   `json:"name"`
-	TargetResourceTypes []string `json:"target_resource_types"`
-	Required            bool     `json:"required"`
+	Constraints         *ResourceReferenceConstraints `json:"constraints,omitempty"`
+	Name                string                        `json:"name"`
+	TargetResourceTypes []string                      `json:"target_resource_types"`
+	Required            bool                          `json:"required"`
+}
+
+type ResourceReferenceConstraints struct {
+	MatchingCatalogOf    string   `json:"matching_catalog_of,omitempty"`
+	AllowedTargetParents []string `json:"allowed_target_parents,omitempty"`
+	MatchingReferences   []string `json:"matching_references,omitempty"`
+}
+
+type ResourceCredentialPolicy struct {
+	ExecutionTargetReference string `json:"execution_target_reference"`
+	PrincipalReference       string `json:"principal_reference,omitempty"`
+	RequireParentAccess      bool   `json:"require_parent_access"`
 }
 
 type ResourcePayloadTypePolicy struct {
