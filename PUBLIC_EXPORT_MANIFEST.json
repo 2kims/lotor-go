@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "0b421bb927f0a718dfb6ab55dc0d0324d2e9bc17",
+  "source_commit": "989b7d4ad381e2bd526883deba7474c5bbf7b677",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -229,11 +229,11 @@
     },
     {
       "path": "lotorhttp/resource_type_test.go",
-      "sha256": "573f2d9f278da3dae5b020c3d6c123cf4b67bd36cc5e9c7d699ce25b82406aaf"
+      "sha256": "b15e4aacc730b6d56a1bc277d1db9c09bc2b8f053be8ca7e4e2307d7bca31efa"
     },
     {
       "path": "lotorhttp/resource_type.go",
-      "sha256": "b2c7894fd26da070ab286d5caebf88d45c2a654246cd41c3130f8f52807c786a"
+      "sha256": "b2dac23cff6bc1d72663dc2b3786eba62ecefb108a897f644685a5ff658eec10"
     },
     {
       "path": "lotorhttp/runtime.go",
