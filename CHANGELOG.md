@@ -6,6 +6,15 @@ are called out explicitly.
 
 ## Unreleased
 
+- Bound runtime authorization and durable reservation by the signed grant's
+  deadline; reject expiry before handler entry or completed-result replay.
+- Persist SQL journal results as bytes so valid JSON NUL strings, large numbers
+  and near-limit arrays survive completion and replay. Explicit initialization
+  transactionally upgrades the published JSONB format without releasing pending
+  reservations. Stop old writers before upgrading; no mixed-version writes.
+- Add a real PostgreSQL regression gate to maintainer local CI, outside the
+  exported SDK and without adding runtime dependencies to its module.
+
 - Require a separately bound canonical provider query in resource execution
   preflight and reject a response that changes any request field.
 - Relay browser-user execution through the same-origin adapter while retaining

@@ -32,20 +32,40 @@ func New(database *sql.DB, namespace string) (*Store, error) {
 // may contain protected customer data: keep this DB inside the runtime's custody
 // boundary. Never point it at Lotor Control as a convenience fallback.
 func (store *Store) Initialize(ctx context.Context) error {
+	tx, err := store.database.BeginTx(ctx, nil)
+	if err != nil {
+		return bridge.ErrUnavailable
+	}
+	defer func() { _ = tx.Rollback() }()
 	for _, statement := range []string{
 		`create schema if not exists lotor_function_runtime`,
 		`create table if not exists lotor_function_runtime.executions (
             namespace text not null check (length(namespace) between 1 and 256),
             operation_id text not null check (length(operation_id) between 1 and 513),
             request_digest text not null check (request_digest ~ '^[a-f0-9]{64}$'),
-            result jsonb check (result is null or jsonb_typeof(result) = 'object'),
+            result bytea,
             created_at timestamptz not null default clock_timestamp(),
             primary key (namespace, operation_id)
         )`,
+		// Explicit, transactional forward upgrade of the published journal.
+		// Keep every row, identity and pending reservation. Stop old writers
+		// before migrating; old binaries cannot write the new bytea format.
+		`do $$ begin
+		 if exists (select 1 from pg_catalog.pg_attribute
+		   where attrelid='lotor_function_runtime.executions'::regclass
+		   and attname='result' and atttypid='jsonb'::regtype and not attisdropped) then
+		  alter table lotor_function_runtime.executions drop constraint if exists executions_result_check;
+		  alter table lotor_function_runtime.executions alter column result type bytea
+		   using convert_to(result::text,'UTF8');
+		 end if;
+		end $$`,
 	} {
-		if _, err := store.database.ExecContext(ctx, statement); err != nil {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
 			return bridge.ErrUnavailable
 		}
+	}
+	if err := tx.Commit(); err != nil {
+		return bridge.ErrUnavailable
 	}
 	return nil
 }
@@ -84,20 +104,31 @@ func (store *Store) Reserve(ctx context.Context, operationID, digest string) (*b
 	if len(raw) > bridge.MaximumBodyBytes || json.Unmarshal(raw, &result) != nil {
 		return nil, bridge.ErrUnavailable
 	}
+	// Former JSONB rows may contain whitespace added by PostgreSQL. Compact
+	// the output before its independent inline-size check/signature, without
+	// interpreting numbers or altering object fields. New bytea rows are
+	// already serialized this way by Complete.
+	if len(result.Output) != 0 {
+		canonical, err := json.Marshal(result.Output)
+		if err != nil || len(canonical) > bridge.MaximumInputBytes {
+			return nil, bridge.ErrUnavailable
+		}
+		result.Output = canonical
+	}
 	return &result, nil
 }
 
 func (store *Store) Complete(ctx context.Context, operationID, digest string, result bridge.Result) error {
-	if !validIdentity(operationID, digest) {
+	if !validIdentity(operationID, digest) || len(result.Output) > bridge.MaximumInputBytes {
 		return bridge.ErrInvalid
 	}
 	raw, err := json.Marshal(result)
 	if err != nil || len(raw) > bridge.MaximumBodyBytes/2 {
 		return bridge.ErrInvalid
 	}
-	updated, err := store.database.ExecContext(ctx, `update lotor_function_runtime.executions set result=$4::jsonb
+	updated, err := store.database.ExecContext(ctx, `update lotor_function_runtime.executions set result=$4
         where namespace=$1 and operation_id=$2 and request_digest=$3
-            and (result is null or result=$4::jsonb)`, store.namespace, operationID, digest, string(raw))
+            and (result is null or result=$4)`, store.namespace, operationID, digest, raw)
 	if err != nil {
 		return bridge.ErrUnavailable
 	}

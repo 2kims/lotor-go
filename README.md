@@ -7,7 +7,7 @@ gateway. The module has no third-party runtime dependencies and requires Go
 
 ## Verified function runtime
 
-The unreleased `bridge` package provides a generic Ed25519-signed ownership
+The `bridge` package provides a generic Ed25519-signed ownership
 challenge and function invocation handler. Customer functions remain application
 code; the runtime has no provider-specific behavior. `bridge/lambda` adapts API
 Gateway HTTP API payload version 2 events to the same handler without an AWS
@@ -35,11 +35,25 @@ changing namespaces or deleting journal rows can repeat external effects.
 The journal can contain customer result data and must stay within the selected
 runtime's custody boundary. It is not a central plaintext copy in Lotor Control.
 
+Result JSON is persisted as bytes, not PostgreSQL `jsonb`, so valid JSON strings
+containing escaped NULs, large numbers and near-limit arrays remain replayable.
+For journals created by v0.3.0-rc.1, stop old writers and run `Initialize` explicitly
+before starting the new runtime. The transactional forward upgrade preserves
+completed rows and incomplete reservations; it neither wipes the database nor
+releases pending operations. Old binaries cannot write the upgraded format.
+
+Maintainer CI tests journal completion, reconnect/replay and explicit upgrades
+against a fresh PostgreSQL database. Database drivers and database-backed test
+fixtures stay outside the exported SDK; its module remains dependency-free.
+
 The runtime validates signatures, expiry, audience, scope, manifest/version and
 input digest before calling application code. Verification challenges never call
 function handlers. Handler errors and panic text are not exposed as protocol
 errors. A timeout, invalid output or handler failure conservatively reports an
 unknown outcome rather than claiming that an external effect did not occur.
+Authorization and reservation share the grant deadline, which is rechecked
+before application dispatch or cached-result replay. A reservation that becomes
+ambiguous at expiry remains blocked; expiry never authorizes another execution.
 
 TLS/mTLS, process isolation, secret custody and durable storage are deployment
 responsibilities. Context deadlines require cooperative handlers; this library

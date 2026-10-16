@@ -374,3 +374,88 @@ func TestInFlightInvocationDoesNotRunTwice(t *testing.T) {
 		t.Fatal("in-flight invocation ran twice")
 	}
 }
+
+type reserveHookStore struct {
+	*testStore
+	hook func(context.Context)
+}
+
+func TestAlreadyCancelledExecutionNeverEntersHandler(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	called := false
+	_, err := execute(ctx, func(context.Context, Authorization) (json.RawMessage, error) {
+		called = true
+		return json.RawMessage(`{}`), nil
+	}, Authorization{})
+	if called || !errors.Is(err, ErrUnavailable) {
+		t.Fatal("cancelled execution entered handler")
+	}
+}
+
+func (s reserveHookStore) Reserve(ctx context.Context, id, digest string) (*Result, error) {
+	s.hook(ctx)
+	return s.testStore.Reserve(ctx, id, digest)
+}
+
+func TestGrantDeadlineBoundsAuthorizationAndReservation(t *testing.T) {
+	f := setup(t)
+	check := func(ctx context.Context) {
+		t.Helper()
+		deadline, ok := ctx.Deadline()
+		if !ok || !deadline.Equal(time.Unix(f.auth.ExpiresAt, 0)) {
+			t.Fatal("dependency did not receive the grant deadline")
+		}
+	}
+	f.config.Authorize = func(ctx context.Context, _ Authorization, _ SignedMessage) error { check(ctx); return nil }
+	f.config.Store = reserveHookStore{testStore: f.store, hook: check}
+	var err error
+	f.runtime, err = NewRuntime(f.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, result := f.call(t, f.auth, "/v1/functions/invoke")
+	if response.Code != 200 || result.ErrorCode != "" || f.calls != 1 {
+		t.Fatal("valid grant failed")
+	}
+}
+
+func TestExpiryDuringDependenciesPreventsHandlerAndCachedReplay(t *testing.T) {
+	for _, stage := range []string{"authorization", "reservation", "cached replay"} {
+		t.Run(stage, func(t *testing.T) {
+			f := setup(t)
+			clock := f.config.Now()
+			f.config.Now = func() time.Time { return clock }
+			if stage == "cached replay" {
+				response, _ := f.call(t, f.auth, "/v1/functions/invoke")
+				if response.Code != 200 {
+					t.Fatal("initial invocation failed")
+				}
+			}
+			previous := f.calls
+			expire := func() { clock = time.Unix(f.auth.ExpiresAt, 0) }
+			if stage == "authorization" {
+				f.config.Authorize = func(context.Context, Authorization, SignedMessage) error { expire(); return nil }
+			} else {
+				f.config.Store = reserveHookStore{testStore: f.store, hook: func(context.Context) { expire() }}
+			}
+			var err error
+			f.runtime, err = NewRuntime(f.config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response, _ := f.call(t, f.auth, "/v1/functions/invoke")
+			if response.Code != 401 || f.calls != previous {
+				t.Fatal("expired grant executed or replayed a result")
+			}
+			if stage == "authorization" && len(f.store.hashes) != 0 {
+				t.Fatal("expired authorization reached reservation")
+			}
+			if stage == "reservation" {
+				if _, err := f.store.Reserve(t.Context(), f.auth.BindingID+":"+f.auth.ID, f.store.hashes[f.auth.BindingID+":"+f.auth.ID]); !errors.Is(err, ErrInProgress) {
+					t.Fatal("ambiguous reservation was released or completed")
+				}
+			}
+		})
+	}
+}

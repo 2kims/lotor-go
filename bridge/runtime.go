@@ -149,12 +149,18 @@ func (runtime *Runtime) ServeHTTP(w http.ResponseWriter, request *http.Request) 
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if err = runtime.config.Authorize(request.Context(), authorization, message); err != nil {
+	grantContext, stopGrant := context.WithDeadline(request.Context(), time.Unix(authorization.ExpiresAt, 0))
+	defer stopGrant()
+	if err = runtime.config.Authorize(grantContext, authorization, message); err != nil {
 		if errors.Is(err, ErrUnavailable) {
 			writeError(w, http.StatusServiceUnavailable, "authorization_unavailable")
 		} else {
 			writeError(w, http.StatusUnauthorized, "unauthorized")
 		}
+		return
+	}
+	if !runtime.grantActive(grantContext, authorization) {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	result := Result{ProtocolVersion: ProtocolVersion, ID: authorization.ID, Kind: authorization.Kind, BindingID: authorization.BindingID, BindingRevision: authorization.BindingRevision, ManifestDigest: authorization.ManifestDigest, AuthorizationDigest: Digest(raw), CompletedAt: runtime.config.Now().Unix()}
@@ -170,7 +176,14 @@ func (runtime *Runtime) ServeHTTP(w http.ResponseWriter, request *http.Request) 
 		}
 		identity := runtime.config.BindingID + ":" + authorization.ID
 		digest := Digest(semanticJSON)
-		stored, reserveErr := runtime.config.Store.Reserve(request.Context(), identity, digest)
+		stored, reserveErr := runtime.config.Store.Reserve(grantContext, identity, digest)
+		// Dependencies can finish after their deadline, even when they honor
+		// cancellation. Never enter application code or replay a cached result
+		// with expired authority. An ambiguous reservation remains non-reexecutable.
+		if !runtime.grantActive(grantContext, authorization) {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 		if errors.Is(reserveErr, ErrInProgress) || errors.Is(reserveErr, ErrConflict) {
 			writeError(w, http.StatusConflict, "operation_conflict")
 			return
@@ -187,7 +200,7 @@ func (runtime *Runtime) ServeHTTP(w http.ResponseWriter, request *http.Request) 
 			if bound := runtime.config.Now().Add(runtime.config.ExecutionTimeout); bound.Before(deadline) {
 				deadline = bound
 			}
-			ctx, cancel := context.WithDeadline(request.Context(), deadline)
+			ctx, cancel := context.WithDeadline(grantContext, deadline)
 			ctx = context.WithValue(ctx, invocationContextKey{}, invocationState{authorization: authorization, signed: message})
 			output, executionErr := execute(ctx, runtime.functions[*authorization.Function], authorization)
 			cancel()
@@ -215,6 +228,10 @@ func (runtime *Runtime) ServeHTTP(w http.ResponseWriter, request *http.Request) 
 		return
 	}
 	_ = json.NewEncoder(w).Encode(signed)
+}
+
+func (runtime *Runtime) grantActive(ctx context.Context, authorization Authorization) bool {
+	return ctx.Err() == nil && runtime.config.Now().Unix() < authorization.ExpiresAt
 }
 
 func (runtime *Runtime) validAuthorization(value Authorization, path string) bool {
@@ -257,6 +274,9 @@ func execute(ctx context.Context, handler Handler, authorization Authorization) 
 			output, err = nil, ErrUnavailable
 		}
 	}()
+	if ctx.Err() != nil {
+		return nil, ErrUnavailable
+	}
 	output, err = handler(ctx, authorization)
 	if ctx.Err() != nil {
 		return nil, ErrUnavailable
