@@ -148,6 +148,12 @@ func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	requestBodyLimit := int64(bodyLimit)
+	if nativeResource && r.Method == "POST" && strings.Contains(path, "/event-streams/") && strings.HasSuffix(path, "/queries") {
+		requestBodyLimit = 256 << 10
+	}
+	if nativeResource && r.Method == "POST" && strings.Contains(path, "/event-streams/") && strings.HasSuffix(path, "/events") {
+		requestBodyLimit = 6 << 20
+	}
 	if nativeResource && strings.HasSuffix(path, "/executions/commit") {
 		requestBodyLimit = executionBodyLimit
 	}
@@ -234,8 +240,12 @@ func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer response.Body.Close()
-	payload, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
-	if err != nil || len(payload) > responseLimit {
+	readLimit := int64(responseLimit)
+	if nativeResource && strings.Contains(path, "/event-streams/") {
+		readLimit = 6 << 20
+	}
+	payload, err := io.ReadAll(io.LimitReader(response.Body, readLimit+1))
+	if err != nil || int64(len(payload)) > readLimit {
 		fail(502)
 		return
 	}

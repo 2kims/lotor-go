@@ -457,6 +457,10 @@ func (c *ControlClient) request(ctx context.Context, method, path, key string, b
 }
 
 func (c *ControlClient) requestHeaders(ctx context.Context, method, path, key string, extra http.Header, body, out any) (http.Header, error) {
+	return c.requestHeadersLimit(ctx, method, path, key, extra, body, out, 4<<20)
+}
+
+func (c *ControlClient) requestHeadersLimit(ctx context.Context, method, path, key string, extra http.Header, body, out any, limit int64) (http.Header, error) {
 	var reader io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
@@ -490,11 +494,11 @@ func (c *ControlClient) requestHeaders(ctx context.Context, method, path, key st
 		return nil, err
 	}
 	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, (4<<20)+1))
+	raw, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil {
 		return nil, err
 	}
-	if len(raw) > 4<<20 {
+	if int64(len(raw)) > limit {
 		return nil, errors.New("Lotor response exceeds limit")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {

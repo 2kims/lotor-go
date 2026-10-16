@@ -9,6 +9,12 @@ import (
 
 func TestItShouldPreserveUserAuthorityForEveryResourceRoute(t *testing.T) {
 	for _, route := range []struct{ method, path string }{
+		{"PUT", "/resources/project%3Aone/event-streams/audit"},
+		{"POST", "/resources/project%3Aone/event-streams/audit/events"},
+		{"POST", "/resources/project%3Aone/event-streams/audit/queries"},
+		{"GET", "/resources/project%3Aone/event-streams/audit/queries/evtq_one/events?cursor=next&limit=10"},
+		{"GET", "/resources/project%3Aone/event-streams/audit/queries/evtq_one/histogram?group_by=result&interval_seconds=60"},
+		{"GET", "/resources/project%3Aone/event-streams/audit/events/event_one"},
 		{"GET", "/resources/project%3Aone"},
 		{"PUT", "/resources/project%3Aone"},
 		{"GET", "/resources/org_one"},

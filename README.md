@@ -5,6 +5,127 @@ the low-level `lotor` client and the optional `lotorhttp` same-origin invitation
 gateway. The module has no third-party runtime dependencies and requires Go
 1.24 or newer.
 
+## Verified function runtime
+
+The `bridge` package provides a generic Ed25519-signed ownership
+challenge and function invocation handler. Customer functions remain application
+code; the runtime has no provider-specific behavior. `bridge/lambda` adapts API
+Gateway HTTP API payload version 2 events to the same handler without an AWS
+dependency. A deployed HTTPS service or a local tunnel uses the same protocol.
+
+Construct `bridge.NewRuntime` with explicit function registrations, trusted issuer
+keys, the exact binding/scope/revision, a current-authorization callback and a
+durable `ExecutionStore`. There is no production in-memory store. Reservations
+must be atomic and survive restarts; incomplete effects must not automatically
+rerun. Completed results can be replayed for the same semantic operation.
+
+Registration returns `binding.Scope`, `binding.Audience` and `binding.Revision`
+for runtime configuration. Fetch issuer/public keys from your explicitly
+configured HTTPS Control URL using `bridge.DiscoverControlKeys`; do not infer the
+trusted origin from an incoming grant or customer function URL. Discovery never
+uses an application secret and does not follow redirects or forward cookie jars.
+
+The optional `bridge/sqlstore` package implements `ExecutionStore` using
+PostgreSQL through the host application's `database/sql` driver. Construct it with
+the custody-local database and a stable namespace (normally the binding ID).
+Call `Initialize` explicitly as a deployment migration, not on each Lambda call.
+Recreating the runtime with the same database/namespace preserves reservations
+and completed results. Incomplete reservations are never expired or stolen;
+changing namespaces or deleting journal rows can repeat external effects.
+The journal can contain customer result data and must stay within the selected
+runtime's custody boundary. It is not a central plaintext copy in Lotor Control.
+
+Result JSON is persisted as bytes, not PostgreSQL `jsonb`, so valid JSON strings
+containing escaped NULs, large numbers and near-limit arrays remain replayable.
+For journals created by v0.3.0-rc.1, stop old writers and run `Initialize` explicitly
+before starting the new runtime. The transactional forward upgrade preserves
+completed rows and incomplete reservations; it neither wipes the database nor
+releases pending operations. Old binaries cannot write the upgraded format.
+
+Maintainer CI tests journal completion, reconnect/replay and explicit upgrades
+against a fresh PostgreSQL database. Database drivers and database-backed test
+fixtures stay outside the exported SDK; its module remains dependency-free.
+
+The runtime validates signatures, expiry, audience, scope, manifest/version and
+input digest before calling application code. Verification challenges never call
+function handlers. Handler errors and panic text are not exposed as protocol
+errors. A timeout, invalid output or handler failure conservatively reports an
+unknown outcome rather than claiming that an external effect did not occur.
+Authorization and reservation share the grant deadline, which is rechecked
+before application dispatch or cached-result replay. A reservation that becomes
+ambiguous at expiry remains blocked; expiry never authorizes another execution.
+
+TLS/mTLS, process isolation, secret custody and durable storage are deployment
+responsibilities. Context deadlines require cooperative handlers; this library
+is not an arbitrary-code sandbox.
+
+Use `ControlClient.ForUser` with `RegisterFunctionBinding`, `FunctionBindings`,
+`FunctionBinding`, `VerifyFunctionBinding` and `RevokeFunctionBinding` to manage
+resource-owned HTTPS registrations. Registration takes an idempotency key and
+public identity/manifest metadata, never private keys. Verification returns an
+accepted binding; poll its challenge/status for the asynchronous outcome. All
+management operations require resource-management authority. Revocation does not
+delete custody keys or choose another provider. These methods are distinct from
+the existing organization E2EE polling-relay methods below.
+
+Use `AuthorizeFunctionInvocation` on the delegated server-side client to obtain a
+30-second signed grant for an exact registered function, input and resource set.
+Preserve its idempotency key across retries: Control rechecks permissions while
+retaining the operation ID. Only the signed authorization goes to the customer
+runtime; never forward the application secret or principal token. `resource.read`
+and `payload.read` are currently supported; neither grants cryptographic custody.
+The application adapter selects its function and authenticates its policy bundle.
+Browser publishable credentials alone cannot issue these grants.
+
+The grant response includes the verified runtime's public signing identity and
+authentication mode, so an authorized caller does not need binding-management
+rights to verify its result. Use `grant.NewClient(controlKeys, transport.Options{})`
+and then `caller.Invoke(ctx, grant.Authorization)`. The invocation client checks
+the Control signature and exact binding/scope/revision before dispatch, and the
+runtime signature and exact invocation binding before returning a result. Reuse
+the client while that binding revision remains current.
+
+Control authorization responses are also checked against the requested binding,
+function, input digest, resource list and capabilities. A valid grant for another
+operation is not accepted as this request's response.
+
+`bridge/transport` is the same safe HTTPS implementation used by Control, with
+DNS pinning, private/metadata destination rejection, no redirects or environment
+proxies, HTTP/2 pooling and required-mTLS enforcement. Normal deployment options
+allow a trusted DNS resolver/socket dialer; these must never come from requests.
+Its 30-second HTTP timeout is additionally bounded by the signed grant deadline.
+There is no automatic retry or alternate runtime. A transport failure or invalid
+result after dispatch returns `bridge.ErrOutcomeUnknown`; preserve the invocation
+identity instead of creating a new operation that might repeat the provider call.
+
+Use `bridge.NewControlValidator` with the configured HTTPS Control URL and the
+runtime's registered signing key, then set `Config.Authorize = validator.Authorize`.
+The callback receives the decoded grant and its original signed message after
+the runtime's signature/static-scope checks. The validator wraps that exact grant
+in a purpose-separated runtime signature; Control rechecks the original issuance,
+current binding/resource permissions, and workload credential expiry/revocation.
+The bridge needs no application secret. Validation is read-only and not a lease
+against future revocation. Application-specific checks can wrap this callback.
+Harmless ownership challenges stay on Control's separate one-use worker path.
+
+For resource reads inside a handler, construct `bridge.NewResourceClient` with
+the same runtime identity and use its `Authorize` method as `Config.Authorize`.
+`AccessPayload(ctx, resource, slot, payloadVersion)` uses the verified invocation
+from the handler context; it cannot run with a background context or access a
+resource without `payload.read` in that invocation. `InvocationFromContext` also
+exposes the verified grant to application-owned SDK integrations; do not log it.
+Resource-access proofs use a different signature purpose from validation proofs.
+
+Control rechecks permissions and the exact requested version, returning the
+stored representation and an object-download lease no longer than the grant's
+remaining lifetime. Download and verify the object with
+`lotorhttp.DownloadResourcePayloadObject`; no caller credentials are attached.
+Encrypted payloads remain encrypted. `payload.read` never authorizes key
+unwrapping, E2EE provisioning or provider execution by itself.
+
+Scoped cryptographic clients and end-to-end tunnel onboarding remain unfinished;
+this is not yet a ready-to-use production integration.
+
 ## SCIM directory setup
 
 Use `ControlClient.ForUser` with `CreateSCIMDirectory`, `SCIMDirectory`,

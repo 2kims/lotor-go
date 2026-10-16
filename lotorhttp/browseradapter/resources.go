@@ -2,9 +2,12 @@ package browseradapter
 
 import (
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 )
+
+var eventStreamPattern = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}$`)
 
 // resourceRoute is a browser-only allowlist. Provisioning endpoints such as
 // resource-types and application credential issuance are intentionally absent.
@@ -88,6 +91,18 @@ func resourceRoute(method, escapedPath string) bool {
 	if len(parts) == 3 && parts[2] == "catalog-binding" {
 		return method == "PUT"
 	}
+	if parts[2] == "event-streams" && len(parts) >= 4 && eventStreamPattern.MatchString(parts[3]) {
+		if len(parts) == 4 {
+			return method == "PUT"
+		}
+		if len(parts) == 5 {
+			return method == "POST" && (parts[4] == "events" || parts[4] == "queries")
+		}
+		if len(parts) == 6 {
+			return method == "GET" && parts[4] == "events" && clientIDPattern.MatchString(parts[5])
+		}
+		return len(parts) == 7 && method == "GET" && parts[4] == "queries" && clientIDPattern.MatchString(parts[5]) && (parts[6] == "events" || parts[6] == "histogram")
+	}
 	if parts[2] == "credentials" {
 		return (len(parts) == 3 && (method == "GET" || method == "POST")) ||
 			(len(parts) == 4 && method == "DELETE" && clientIDPattern.MatchString(parts[3])) ||
@@ -131,6 +146,10 @@ func validResourceQuery(method, path, raw string) bool {
 	}
 	allowed := ""
 	switch {
+	case strings.Contains(path, "/event-streams/") && strings.Contains(path, "/queries/") && strings.HasSuffix(path, "/events"):
+		allowed = " cursor limit "
+	case strings.Contains(path, "/event-streams/") && strings.Contains(path, "/queries/") && strings.HasSuffix(path, "/histogram"):
+		allowed = " group_by interval_seconds "
 	case path == prefix+"/key-access/resource-envelope":
 		allowed = " resource "
 	case path == prefix+"/me/invitations":

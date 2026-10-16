@@ -17,6 +17,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/2kims/lotor-go/bridge"
 )
 
 // ResourceClient authenticates one workload principal with a Lotor-issued
@@ -342,26 +344,7 @@ func executionAEAD(key []byte) (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
-type ResourcePayloadManifest struct {
-	Resource            string `json:"resource"`
-	Slot                string `json:"slot"`
-	SchemaID            string `json:"schema_id"`
-	Representation      string `json:"representation"`
-	ObjectDigest        string `json:"object_digest"`
-	EncryptionSuite     string `json:"encryption_suite,omitempty"`
-	KeyBindingRef       string `json:"key_binding_ref,omitempty"`
-	WrappedPayloadKey   string `json:"wrapped_payload_key,omitempty"`
-	AADHash             string `json:"aad_hash,omitempty"`
-	EncryptorSubject    string `json:"encryptor_subject,omitempty"`
-	EncryptorKeyID      string `json:"encryptor_key_id,omitempty"`
-	State               string `json:"state"`
-	PayloadVersion      int64  `json:"payload_version"`
-	ObjectSize          int64  `json:"object_size"`
-	KeyVersion          int64  `json:"key_version,omitempty"`
-	ResourceRevision    int64  `json:"resource_revision"`
-	LifecycleGeneration int64  `json:"lifecycle_generation"`
-	CommittedAt         int64  `json:"committed_at"`
-}
+type ResourcePayloadManifest = bridge.ResourcePayloadManifest
 
 type ResourcePayloadUploadInput struct {
 	KeyBindingRef          string `json:"key_binding_ref,omitempty"`
@@ -401,20 +384,7 @@ type ResourcePayloadMutation struct {
 	Idempotent     bool   `json:"idempotent"`
 }
 
-type ResourcePayloadAccessLease struct {
-	Resource            string `json:"resource"`
-	Slot                string `json:"slot"`
-	Representation      string `json:"representation"`
-	ObjectDigest        string `json:"object_digest"`
-	DownloadURL         string `json:"download_url"`
-	DownloadMethod      string `json:"download_method"`
-	Audience            string `json:"audience"`
-	PayloadVersion      int64  `json:"payload_version"`
-	ObjectSize          int64  `json:"object_size"`
-	ExpiresAt           int64  `json:"expires_at"`
-	ResourceRevision    int64  `json:"resource_revision"`
-	LifecycleGeneration int64  `json:"lifecycle_generation"`
-}
+type ResourcePayloadAccessLease = bridge.ResourcePayloadAccessLease
 
 func (c *ResourceClient) ResourcePayload(ctx context.Context, resource, slot string) (ResourcePayloadManifest, error) {
 	var out ResourcePayloadManifest
@@ -440,6 +410,10 @@ func downloadResourcePayload(ctx context.Context, client *http.Client, lease Res
 	if err != nil || lease.DownloadMethod != http.MethodGet {
 		return nil, errors.New("invalid resource payload access lease")
 	}
+	limit := lease.ObjectSize
+	if limit < 0 || limit > 64<<20 {
+		return nil, errors.New("invalid resource payload object size")
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
 		return nil, err
@@ -453,10 +427,6 @@ func downloadResourcePayload(ctx context.Context, client *http.Client, lease Res
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
 		return nil, fmt.Errorf("resource payload download failed with status %d", response.StatusCode)
 	}
-	limit := lease.ObjectSize
-	if limit < 0 || limit > 64<<20 {
-		return nil, errors.New("invalid resource payload object size")
-	}
 	raw, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil || int64(len(raw)) != limit {
 		return nil, errors.New("resource payload download size does not match lease")
@@ -464,6 +434,19 @@ func downloadResourcePayload(ctx context.Context, client *http.Client, lease Res
 	digest := sha256.Sum256(raw)
 	if fmt.Sprintf("%x", digest[:]) != strings.ToLower(strings.TrimSpace(lease.ObjectDigest)) {
 		return nil, errors.New("resource payload download digest does not match lease")
+	}
+	return raw, nil
+}
+
+// DownloadResourcePayloadObject downloads and verifies the exact object named
+// by a lease. It attaches no application, user or runtime signing credentials.
+func DownloadResourcePayloadObject(ctx context.Context, client *http.Client, lease ResourcePayloadAccessLease) ([]byte, error) {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	raw, err := downloadResourcePayload(ctx, client, lease)
+	if err != nil {
+		return nil, bridge.ErrUnavailable
 	}
 	return raw, nil
 }
