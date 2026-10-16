@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "2c2d4c180cd32ad406fcb57ec590e49b3e29df4b",
+  "source_commit": "00154ebac8860ca62b83863b0e6408540d014189",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -85,7 +85,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3d8d2ee7175493a0bc9e8d46e18b6082ad50c4d851c16c180f2de20c2ca43b85"
+      "sha256": "36d2743f2da3bfb8cf3c21e9782ecd0d42ec77a50446d5cc96503c9e0bfa644c"
     },
     {
       "path": "examples/basic/main.go",
@@ -165,7 +165,7 @@
     },
     {
       "path": "lotorhttp/browseradapter/adapter.go",
-      "sha256": "775ded92244c73d2bc79f69cd72c8c3243a48114a1316790abbdd1c093a6f113"
+      "sha256": "a609b35153705879bda45ddd5664dc9f348226897c13c5ec431e64d37d814305"
     },
     {
       "path": "lotorhttp/browseradapter/catalog_test.go",
@@ -188,12 +188,16 @@
       "sha256": "3259d14ce2ecca0e5008894505d0ba350afc98eeedccb1400c4165a6c039d883"
     },
     {
+      "path": "lotorhttp/browseradapter/resource_events_test.go",
+      "sha256": "8a64ccac1239c6086d50043c98b24b1fa0a8e09d2ef815c2cd2474f3591a9c1c"
+    },
+    {
       "path": "lotorhttp/browseradapter/resources_test.go",
-      "sha256": "e7cc6123bc1e20ad164d9c5e22bef411fcc170c8fe4626a74c39aebd0f134a0e"
+      "sha256": "4db240a6511bdbeb06ba11c0b2166a831c89110720115f6a0931dde1ce0cb8f3"
     },
     {
       "path": "lotorhttp/browseradapter/resources.go",
-      "sha256": "f95f03f2dfd243bf156a780d13652bd8f55364f57317af679d3f18c97b32670c"
+      "sha256": "31e08cb70eb5e41e2d3c25701377fc8f1b1a30b1fbdc3063790049dcdf34eee2"
     },
     {
       "path": "lotorhttp/browseradapter/scim_test.go",
@@ -286,6 +290,14 @@
     {
       "path": "lotorhttp/resource_client.go",
       "sha256": "3f3f6153da535c7a3a19411175dfae96ac7c5fa79ba267bf8bb6db4c4c8fc283"
+    },
+    {
+      "path": "lotorhttp/resource_events_test.go",
+      "sha256": "b12b0f97bd7ba675c1951f43bac68aa7c5be82b73b094863bd29d6a0f8036d95"
+    },
+    {
+      "path": "lotorhttp/resource_events.go",
+      "sha256": "dcedba55d748e78fde61766407e9d536af8124e1662cbc58f4055e5f932761f2"
     },
     {
       "path": "lotorhttp/resource_links_test.go",

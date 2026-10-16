@@ -6,6 +6,12 @@ are called out explicitly.
 
 ## Unreleased
 
+- Add generic resource-event stream configuration, append, snapshot queries,
+  pagination, histograms and body reads. Native resource credentials can append
+  only to an explicitly enabled stream on their exact owning resource.
+- Allow the browser adapter's event routes with bounded request/response framing;
+  event bodies retain separate authorization from metadata queries.
+
 - Bound runtime authorization and durable reservation by the signed grant's
   deadline; reject expiry before handler entry or completed-result replay.
 - Persist SQL journal results as bytes so valid JSON NUL strings, large numbers
