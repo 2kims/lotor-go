@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "0b421bb927f0a718dfb6ab55dc0d0324d2e9bc17",
+  "source_commit": "9b749a9a7f895b8ec22702e9d083321e7faf7dc3",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -10,6 +10,78 @@
     {
       "path": ".github/workflows/release.yml",
       "sha256": "772e30fc46380a50a2348bb9e31fc208b5f9606253d1bd4ad2d3318ad4961820"
+    },
+    {
+      "path": "bridge/client/client_test.go",
+      "sha256": "ed11467c003b11a73ed41bf7e7700fe69ee26d8525182b6300262fcc9f8fa97c"
+    },
+    {
+      "path": "bridge/client/client.go",
+      "sha256": "e63826ba2ad22f5af38e114474eae41516e8066f9da027997a82b77f3eaa2c32"
+    },
+    {
+      "path": "bridge/discovery_test.go",
+      "sha256": "e9bee6280a989e31891b4d3acd81fd4db261fcfce6dfa870287c0ffbd2efc91b"
+    },
+    {
+      "path": "bridge/discovery.go",
+      "sha256": "a9d80774aa9222de9bb7a886411da2e3678efd1311c01e087a98c999aff4da1e"
+    },
+    {
+      "path": "bridge/lambda/handler_test.go",
+      "sha256": "754ed50bc13488c46ede7e95f49dc8c0bcdbb154c210cbfdf8f5d99ba9039acb"
+    },
+    {
+      "path": "bridge/lambda/handler.go",
+      "sha256": "dd6b88c2ca1190c30d2672238316938a33a6743c268b2e7379b828501ccd9429"
+    },
+    {
+      "path": "bridge/limits_test.go",
+      "sha256": "dd949fa29afa0b31a9e2902ba0f5cd5a9b03df52336b4bd90f7321dde037e08e"
+    },
+    {
+      "path": "bridge/protocol_test.go",
+      "sha256": "af627b6e7e65e4beb537d23867bb65c1cfd017ea333666ab39b7b01a69b51969"
+    },
+    {
+      "path": "bridge/protocol.go",
+      "sha256": "e37fae135e24a7ad23ea6b00675a4c8ba850a2b13d47aa41f8152dc96a77b6f9"
+    },
+    {
+      "path": "bridge/resource_test.go",
+      "sha256": "4c8729d607f68a5511f9a2628ccac4a969777333ecdfe9561a98e7bf143608b0"
+    },
+    {
+      "path": "bridge/resource.go",
+      "sha256": "fd452802685870a3984708feb6cd6898b202061bbf18bbaa9f0756c0c583f631"
+    },
+    {
+      "path": "bridge/runtime_test.go",
+      "sha256": "e0cd93b480f3ff29e85514b9489cd3a6a66ba7369504bc222bdef0f071d697b5"
+    },
+    {
+      "path": "bridge/runtime.go",
+      "sha256": "6127fa3b88b41965f08ac54199b3505205fb2a5149dd2e7a9c8299adbad23c0f"
+    },
+    {
+      "path": "bridge/sqlstore/postgres.go",
+      "sha256": "3d14fae8e82157795ce63033c550a1b2788eaf2f97b201596fb88d920f8bfe28"
+    },
+    {
+      "path": "bridge/transport/https_test.go",
+      "sha256": "7224999f8b958272fc28063bf1eabce1dac820634e2f61c651064cd55f7892d7"
+    },
+    {
+      "path": "bridge/transport/https.go",
+      "sha256": "b3ae7bcf2deca175a66f37ec9916f594324aea36805b04773a36c7d3d5bd8cc8"
+    },
+    {
+      "path": "bridge/validation_test.go",
+      "sha256": "09a564b618005d937d96404d6195b438374b84ffa3373031579fdb98fe183392"
+    },
+    {
+      "path": "bridge/validation.go",
+      "sha256": "aaf072c4e1a79c4240f78eb60eaa3849be2e36c381cca4a83399039df79ff6f7"
     },
     {
       "path": "CHANGELOG.md",
@@ -157,7 +229,7 @@
     },
     {
       "path": "lotorhttp/control_client.go",
-      "sha256": "491712958746daa57a37a82eff304bf87567c5045005e160effa2161bbb79848"
+      "sha256": "ec561e01bcf7c9dd9c1b44f8441721b54942f32b75bfe5fdcab71742cc89fd91"
     },
     {
       "path": "lotorhttp/control_payload_read_test.go",
@@ -174,6 +246,14 @@
     {
       "path": "lotorhttp/control.go",
       "sha256": "7d9d2db3612559352f5e0e0ee12de1250c9ceadf4112e6c01bf5ff2dda34200a"
+    },
+    {
+      "path": "lotorhttp/function_bindings_test.go",
+      "sha256": "ed241f8d04d880627a1bf6018f4df8e851c8d7bc0ddd4017f5084e32a65ce64d"
+    },
+    {
+      "path": "lotorhttp/function_bindings.go",
+      "sha256": "6df777953c361f5f7ec9deeeaa78ad2c617f1597f5ea757f6119fd49ca80b5dc"
     },
     {
       "path": "lotorhttp/gateway_assertion_test.go",
@@ -205,7 +285,7 @@
     },
     {
       "path": "lotorhttp/resource_client.go",
-      "sha256": "a41e5d73fcd77cc79f5d50391b295acc66c375abf1a7eedaeaea48f85fd388a9"
+      "sha256": "3f3f6153da535c7a3a19411175dfae96ac7c5fa79ba267bf8bb6db4c4c8fc283"
     },
     {
       "path": "lotorhttp/resource_links_test.go",
@@ -229,11 +309,11 @@
     },
     {
       "path": "lotorhttp/resource_type_test.go",
-      "sha256": "573f2d9f278da3dae5b020c3d6c123cf4b67bd36cc5e9c7d699ce25b82406aaf"
+      "sha256": "b15e4aacc730b6d56a1bc277d1db9c09bc2b8f053be8ca7e4e2307d7bca31efa"
     },
     {
       "path": "lotorhttp/resource_type.go",
-      "sha256": "b2c7894fd26da070ab286d5caebf88d45c2a654246cd41c3130f8f52807c786a"
+      "sha256": "b2dac23cff6bc1d72663dc2b3786eba62ecefb108a897f644685a5ff658eec10"
     },
     {
       "path": "lotorhttp/runtime.go",
@@ -253,7 +333,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "52b3269f4ad33b5d6c8cf788667826afd939b1b5c8446646fcc3bb9327653747"
+      "sha256": "770c2a9b2eea07d17f61feeca85500ae76d139fdce7d0ee8d989cb052642a0ba"
     },
     {
       "path": "scripts/check-consumer.sh",
