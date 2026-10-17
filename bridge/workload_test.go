@@ -67,7 +67,7 @@ func TestWorkloadContextRejectsMismatchedMalformedAndUnavailableResponses(t *tes
 	original, _ := SignAuthorization(f.auth, "issuer-key", f.issuer)
 	ctx := context.WithValue(t.Context(), invocationContextKey{}, invocationState{authorization: f.auth, signed: original})
 	valid := WorkloadContext{InvocationID: f.auth.ID, BindingID: f.auth.BindingID, Scope: f.auth.Scope, Principal: f.auth.Principal, AuthorityKind: "subject"}
-	for _, name := range []string{"valid-subject", "invocation", "binding", "tenant", "application", "environment", "owner", "principal", "kind", "missing-native-resource", "invalid-native-resource", "unexpected-subject-resource", "unknown-field", "trailing-json", "oversized", "unauthorized", "unavailable", "redirect"} {
+	for _, name := range []string{"valid-subject", "invocation", "binding", "tenant", "application", "environment", "owner", "principal", "kind", "missing-native-resource", "empty-native-resource", "null-native-resource", "invalid-native-resource", "unexpected-subject-resource", "unexpected-subject-empty-resource", "unexpected-subject-null-resource", "unknown-field", "trailing-json", "oversized", "unauthorized", "unavailable", "redirect"} {
 		t.Run(name, func(t *testing.T) {
 			value := valid
 			code := http.StatusOK
@@ -88,7 +88,7 @@ func TestWorkloadContextRejectsMismatchedMalformedAndUnavailableResponses(t *tes
 				value.Principal = "another"
 			case "kind":
 				value.AuthorityKind = "unknown"
-			case "missing-native-resource":
+			case "missing-native-resource", "empty-native-resource", "null-native-resource":
 				value.AuthorityKind = "resource_credential"
 			case "invalid-native-resource":
 				value.AuthorityKind, value.AuthorityResource = "resource_credential", "key with whitespace"
@@ -102,6 +102,12 @@ func TestWorkloadContextRejectsMismatchedMalformedAndUnavailableResponses(t *tes
 				code = 307
 			}
 			body, _ := json.Marshal(value)
+			if name == "unexpected-subject-empty-resource" || name == "empty-native-resource" {
+				body = append(body[:len(body)-1], []byte(`,"authority_resource":""}`)...)
+			}
+			if name == "unexpected-subject-null-resource" || name == "null-native-resource" {
+				body = append(body[:len(body)-1], []byte(`,"authority_resource":null}`)...)
+			}
 			if name == "unknown-field" {
 				body = append(body[:len(body)-1], []byte(`,"private_key":"do-not-trust"}`)...)
 			}

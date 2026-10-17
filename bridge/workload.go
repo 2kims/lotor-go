@@ -61,10 +61,19 @@ func (client *ResourceClient) WorkloadContext(ctx context.Context) (WorkloadCont
 	// protected request. Do not accept arbitrary payloads from a dependency.
 	raw, err := io.ReadAll(io.LimitReader(response.Body, (16<<10)+1))
 	var result WorkloadContext
-	if err != nil || len(raw) > 16<<10 || strictJSON(raw, &result) != nil ||
-		result.InvocationID != grant.ID || result.BindingID != grant.BindingID || result.Scope != grant.Scope || result.Principal != grant.Principal ||
+	if err != nil || len(raw) > 16<<10 || strictJSON(raw, &result) != nil {
+		return WorkloadContext{}, ErrUnavailable
+	}
+	// Presence matters for subject authority: explicit null/empty values must
+	// not be silently treated as an absent authority_resource field.
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return WorkloadContext{}, ErrUnavailable
+	}
+	_, hasAuthorityResource := fields["authority_resource"]
+	if result.InvocationID != grant.ID || result.BindingID != grant.BindingID || result.Scope != grant.Scope || result.Principal != grant.Principal ||
 		!validScope(result.Scope) || !identifier(result.Principal, 256) ||
-		!(result.AuthorityKind == "subject" && result.AuthorityResource == "" || result.AuthorityKind == "resource_credential" && identifier(result.AuthorityResource, 256)) {
+		!(result.AuthorityKind == "subject" && !hasAuthorityResource || result.AuthorityKind == "resource_credential" && identifier(result.AuthorityResource, 256)) {
 		return WorkloadContext{}, ErrUnavailable
 	}
 	return result, nil
