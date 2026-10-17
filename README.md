@@ -117,7 +117,11 @@ exposes the verified grant to application-owned SDK integrations; do not log it.
 Resource-access proofs use a different signature purpose from validation proofs.
 
 `resources.WorkloadContext(ctx)` resolves the original workload inside a verified
-handler using the registered runtime identity. Every call freshly validates the
+invocation authorization callback or handler using the registered runtime identity.
+Signature and static scope checks happen first; Control still freshly validates
+every resource/context proof. Resolve current custody and policy in `Authorize`
+to protect both new execution and cached-result replay. Ownership challenges
+never receive an invocation context. Every call freshly validates the
 exact persisted grant with Control. The response binds `invocation_id`,
 `binding_id`, `scope` and `principal`, and distinguishes `authority_kind: subject`
 from `resource_credential`. The latter includes `authority_resource`, the native

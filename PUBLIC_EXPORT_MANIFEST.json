@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "70cd71b81fa8d59292443ea1112550a7f3d6c26b",
+  "source_commit": "f79b1fbf7890ba8d9895180e8d1d26f0a6a7a2e9",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -61,7 +61,7 @@
     },
     {
       "path": "bridge/runtime.go",
-      "sha256": "6f6115350b64b7c3b0bfc6d0f5f4f8263d6a1d080bea2a1db1249f514ff71766"
+      "sha256": "359e3848f17b0f9689eb725bc237e2087437075b745a658c1301673915be4176"
     },
     {
       "path": "bridge/sqlstore/postgres.go",
@@ -84,12 +84,16 @@
       "sha256": "aaf072c4e1a79c4240f78eb60eaa3849be2e36c381cca4a83399039df79ff6f7"
     },
     {
+      "path": "bridge/workload_replay_test.go",
+      "sha256": "e6cc869e79c332182df4b56d8f589ffbd005199735153141dcdc9c4fa1e12bc9"
+    },
+    {
       "path": "bridge/workload_test.go",
       "sha256": "57d24a3a836c34ddfd3f60ebb74486a52bbfda76f5e9b05b391d3e91103808e2"
     },
     {
       "path": "bridge/workload.go",
-      "sha256": "5101eb256797a94504b531e9686992750d68444f4ea28714b9e4f65060e0261f"
+      "sha256": "b429c02c80e0311c5c03bca8085b5f0ebbdabcbbf2ea302d4dfbc8d1d5446290"
     },
     {
       "path": "CHANGELOG.md",
@@ -353,7 +357,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "c29266f968b00a69417c6732f9269dd2def65484208b9747ea76f37bdc680a87"
+      "sha256": "06799910bf697388e45af1b225aabcae2c0adf1b71b0e054f838e85aa62fa861"
     },
     {
       "path": "scripts/check-consumer.sh",
