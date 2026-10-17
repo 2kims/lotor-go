@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "00154ebac8860ca62b83863b0e6408540d014189",
+  "source_commit": "70cd71b81fa8d59292443ea1112550a7f3d6c26b",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -82,6 +82,14 @@
     {
       "path": "bridge/validation.go",
       "sha256": "aaf072c4e1a79c4240f78eb60eaa3849be2e36c381cca4a83399039df79ff6f7"
+    },
+    {
+      "path": "bridge/workload_test.go",
+      "sha256": "57d24a3a836c34ddfd3f60ebb74486a52bbfda76f5e9b05b391d3e91103808e2"
+    },
+    {
+      "path": "bridge/workload.go",
+      "sha256": "5101eb256797a94504b531e9686992750d68444f4ea28714b9e4f65060e0261f"
     },
     {
       "path": "CHANGELOG.md",
@@ -345,7 +353,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "18335a270b64da816275d001dd43a5db670c587dd44f690a0446288b6f0e0955"
+      "sha256": "c29266f968b00a69417c6732f9269dd2def65484208b9747ea76f37bdc680a87"
     },
     {
       "path": "scripts/check-consumer.sh",
