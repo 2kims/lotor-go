@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "3a9995edf1a320d03882f560c4a575c4378b58dc",
+  "source_commit": "bc674369135a833d04c712c7622ae71fb2ff8ad7",
   "files": [
     {
       "path": ".github/CODEOWNERS",
@@ -85,7 +85,7 @@
     },
     {
       "path": "bridge/workload_test.go",
-      "sha256": "2198ce11388269673216377e69ef6a2b32a0ad3fa6a93915bab22d5427d6ab37"
+      "sha256": "c242a6e0f582b26a9283101e544b1e3d1ab463f428b74cfeb014341943cc5e82"
     },
     {
       "path": "bridge/workload.go",

@@ -40,14 +40,14 @@ func TestWorkloadContextRequiresVerifiedHandlerAndExactRuntimeProof(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.WorkloadContext(t.Context()); err != ErrUnauthorized || calls.Load() != 0 {
-		t.Fatal("context worked outside verified handler", err)
+	if _, contextErr := client.WorkloadContext(t.Context()); !errors.Is(contextErr, ErrUnauthorized) || calls.Load() != 0 {
+		t.Fatal("context worked outside verified handler", contextErr)
 	}
 	f.config.Functions[0].Handler = func(ctx context.Context, _ Authorization) (json.RawMessage, error) {
 		for range 2 {
-			got, err := client.WorkloadContext(ctx)
-			if err != nil || got != want {
-				t.Errorf("wrong fresh context: %+v %v", got, err)
+			got, contextErr := client.WorkloadContext(ctx)
+			if contextErr != nil || got != want {
+				t.Errorf("wrong fresh context: %+v %v", got, contextErr)
 			}
 		}
 		return json.RawMessage(`{"ok":true}`), nil
