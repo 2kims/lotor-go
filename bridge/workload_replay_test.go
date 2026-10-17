@@ -51,8 +51,8 @@ func TestWorkloadPolicyMustBeRevalidatedBeforeReservationAndReplay(t *testing.T)
 			t.Error("verified original invocation unavailable before replay")
 			return ErrUnauthorized
 		}
-		_, err := client.WorkloadContext(ctx)
-		return err
+		_, contextErr := client.WorkloadContext(ctx)
+		return contextErr
 	}
 	f.runtime, err = NewRuntime(f.config)
 	if err != nil {
