@@ -116,6 +116,17 @@ resource without `payload.read` in that invocation. `InvocationFromContext` also
 exposes the verified grant to application-owned SDK integrations; do not log it.
 Resource-access proofs use a different signature purpose from validation proofs.
 
+`resources.WorkloadContext(ctx)` resolves the original workload inside a verified
+handler using the registered runtime identity. Every call freshly validates the
+exact persisted grant with Control. The response binds `invocation_id`,
+`binding_id`, `scope` and `principal`, and distinguishes `authority_kind: subject`
+from `resource_credential`. The latter includes `authority_resource`, the native
+credential's original owning resource. Two keys held by the same bot remain
+distinct. Never infer this identity from function input or the principal alone.
+The response contains no presented credential, internal credential ID/version,
+private key or payload. It grants no additional read permission and is not a
+cacheable revocation lease. Existing `Authorize` behavior and grants are unchanged.
+
 Control rechecks permissions and the exact requested version, returning the
 stored representation and an object-download lease no longer than the grant's
 remaining lifetime. Download and verify the object with
