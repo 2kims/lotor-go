@@ -22,8 +22,9 @@ type (
 )
 
 // InvocationFromContext returns the verified invocation associated with this
-// handler call. It is unavailable outside an authorized runtime execution and
-// is never populated for ownership challenges. Do not log the signed grant.
+// authorization callback or handler call, after signature/static scope checks.
+// Fresh Control validation is still required. It is never populated for
+// ownership challenges. Do not log the signed grant.
 func InvocationFromContext(ctx context.Context) (Authorization, SignedMessage, bool) {
 	state, ok := ctx.Value(invocationContextKey{}).(invocationState)
 	return state.authorization, state.signed, ok
@@ -151,6 +152,12 @@ func (runtime *Runtime) ServeHTTP(w http.ResponseWriter, request *http.Request) 
 	}
 	grantContext, stopGrant := context.WithDeadline(request.Context(), time.Unix(authorization.ExpiresAt, 0))
 	defer stopGrant()
+	if authorization.Kind == "invocation" {
+		// Custody/policy checks must resolve original workload identity before
+		// either reserving an execution or returning a cached result. Resource
+		// methods independently revalidate the original grant with Control.
+		grantContext = context.WithValue(grantContext, invocationContextKey{}, invocationState{authorization: authorization, signed: message})
+	}
 	if err = runtime.config.Authorize(grantContext, authorization, message); err != nil {
 		if errors.Is(err, ErrUnavailable) {
 			writeError(w, http.StatusServiceUnavailable, "authorization_unavailable")
@@ -201,7 +208,6 @@ func (runtime *Runtime) ServeHTTP(w http.ResponseWriter, request *http.Request) 
 				deadline = bound
 			}
 			ctx, cancel := context.WithDeadline(grantContext, deadline)
-			ctx = context.WithValue(ctx, invocationContextKey{}, invocationState{authorization: authorization, signed: message})
 			output, executionErr := execute(ctx, runtime.functions[*authorization.Function], authorization)
 			cancel()
 			canonical, marshalErr := json.Marshal(output)

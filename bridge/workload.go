@@ -23,7 +23,8 @@ type WorkloadContext struct {
 	AuthorityResource string `json:"authority_resource,omitempty"`
 }
 
-// WorkloadContext is available only inside a verified function handler. Every
+// WorkloadContext is available only inside a verified invocation authorization
+// callback or function handler. Every
 // call revalidates with Control using this runtime's proof of the original grant;
 // no user/API credential is forwarded and no response is cached.
 func (client *ResourceClient) WorkloadContext(ctx context.Context) (WorkloadContext, error) {
