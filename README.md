@@ -126,6 +126,8 @@ distinct. Never infer this identity from function input or the principal alone.
 The response contains no presented credential, internal credential ID/version,
 private key or payload. It grants no additional read permission and is not a
 cacheable revocation lease. Existing `Authorize` behavior and grants are unchanged.
+Workload-context responses reject duplicate or case-aliased identity and scope
+fields, including an authority value followed by a duplicate `null`.
 
 Control rechecks permissions and the exact requested version, returning the
 stored representation and an object-download lease no longer than the grant's

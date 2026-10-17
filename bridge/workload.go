@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"time"
 )
 
@@ -60,14 +61,20 @@ func (client *ResourceClient) WorkloadContext(ctx context.Context) (WorkloadCont
 	// Identity metadata is small even when the original grant contains a large
 	// protected request. Do not accept arbitrary payloads from a dependency.
 	raw, err := io.ReadAll(io.LimitReader(response.Body, (16<<10)+1))
-	var result WorkloadContext
-	if err != nil || len(raw) > 16<<10 || strictJSON(raw, &result) != nil {
+	if err != nil || len(raw) > 16<<10 {
 		return WorkloadContext{}, ErrUnavailable
 	}
-	// Presence matters for subject authority: explicit null/empty values must
-	// not be silently treated as an absent authority_resource field.
-	var fields map[string]json.RawMessage
-	if json.Unmarshal(raw, &fields) != nil {
+	// Check exact names and duplicates before Go's case-insensitive struct
+	// decoder can merge aliases or retain a value preceding a duplicate null.
+	fields, err := workloadObjectFields(raw, "invocation_id", "binding_id", "scope", "principal", "authority_kind", "authority_resource")
+	if err != nil {
+		return WorkloadContext{}, ErrUnavailable
+	}
+	if _, err = workloadObjectFields(fields["scope"], "tenant_id", "application_id", "environment_id", "owner_resource"); err != nil {
+		return WorkloadContext{}, ErrUnavailable
+	}
+	var result WorkloadContext
+	if strictJSON(raw, &result) != nil {
 		return WorkloadContext{}, ErrUnavailable
 	}
 	_, hasAuthorityResource := fields["authority_resource"]
@@ -77,4 +84,32 @@ func (client *ResourceClient) WorkloadContext(ctx context.Context) (WorkloadCont
 		return WorkloadContext{}, ErrUnavailable
 	}
 	return result, nil
+}
+
+// workloadObjectFields is deliberately local to workload-context decoding; it
+// does not change decoding of other SDK protocols or signed payload bytes.
+func workloadObjectFields(raw []byte, names ...string) (map[string]json.RawMessage, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') {
+		return nil, ErrInvalid
+	}
+	fields := make(map[string]json.RawMessage, len(names))
+	for decoder.More() {
+		token, err = decoder.Token()
+		name, ok := token.(string)
+		_, duplicate := fields[name]
+		if err != nil || !ok || duplicate || !slices.Contains(names, name) {
+			return nil, ErrInvalid
+		}
+		var value json.RawMessage
+		if err = decoder.Decode(&value); err != nil {
+			return nil, ErrInvalid
+		}
+		fields[name] = value
+	}
+	if token, err = decoder.Token(); err != nil || token != json.Delim('}') || decoder.Decode(new(any)) != io.EOF {
+		return nil, ErrInvalid
+	}
+	return fields, nil
 }

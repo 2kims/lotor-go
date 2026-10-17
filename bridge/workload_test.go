@@ -67,7 +67,7 @@ func TestWorkloadContextRejectsMismatchedMalformedAndUnavailableResponses(t *tes
 	original, _ := SignAuthorization(f.auth, "issuer-key", f.issuer)
 	ctx := context.WithValue(t.Context(), invocationContextKey{}, invocationState{authorization: f.auth, signed: original})
 	valid := WorkloadContext{InvocationID: f.auth.ID, BindingID: f.auth.BindingID, Scope: f.auth.Scope, Principal: f.auth.Principal, AuthorityKind: "subject"}
-	for _, name := range []string{"valid-subject", "invocation", "binding", "tenant", "application", "environment", "owner", "principal", "kind", "missing-native-resource", "empty-native-resource", "null-native-resource", "invalid-native-resource", "unexpected-subject-resource", "unexpected-subject-empty-resource", "unexpected-subject-null-resource", "unknown-field", "trailing-json", "oversized", "unauthorized", "unavailable", "redirect"} {
+	for _, name := range []string{"valid-subject", "valid-escaped-subject", "valid-escaped-native", "valid-escaped-scope", "invocation", "binding", "tenant", "application", "environment", "owner", "principal", "kind", "missing-native-resource", "empty-native-resource", "null-native-resource", "invalid-native-resource", "unexpected-subject-resource", "unexpected-subject-empty-resource", "unexpected-subject-null-resource", "subject-resource-alias", "subject-empty-alias", "subject-null-alias", "kind-alias", "scope-alias", "duplicate-principal", "duplicate-escaped-principal", "duplicate-kind", "duplicate-native-null", "duplicate-scope", "duplicate-scope-tenant", "unknown-field", "trailing-json", "oversized", "unauthorized", "unavailable", "redirect"} {
 		t.Run(name, func(t *testing.T) {
 			value := valid
 			code := http.StatusOK
@@ -94,6 +94,8 @@ func TestWorkloadContextRejectsMismatchedMalformedAndUnavailableResponses(t *tes
 				value.AuthorityKind, value.AuthorityResource = "resource_credential", "key with whitespace"
 			case "unexpected-subject-resource":
 				value.AuthorityResource = "key:forged"
+			case "duplicate-native-null", "valid-escaped-native":
+				value.AuthorityKind, value.AuthorityResource = "resource_credential", "key:original"
 			case "unauthorized":
 				code = 403
 			case "unavailable":
@@ -102,6 +104,41 @@ func TestWorkloadContextRejectsMismatchedMalformedAndUnavailableResponses(t *tes
 				code = 307
 			}
 			body, _ := json.Marshal(value)
+			switch name {
+			case "valid-escaped-subject":
+				body = []byte(strings.Replace(string(body), `"principal"`, `"\u0070rincipal"`, 1))
+			case "valid-escaped-native":
+				body = []byte(strings.Replace(string(body), `"authority_resource"`, `"\u0061uthority_resource"`, 1))
+			case "valid-escaped-scope":
+				body = []byte(strings.Replace(string(body), `"tenant_id"`, `"\u0074enant_id"`, 1))
+			case "subject-resource-alias":
+				body = append(body[:len(body)-1], []byte(`,"AUTHORITY_RESOURCE":"key:forged"}`)...)
+			case "subject-empty-alias":
+				body = append(body[:len(body)-1], []byte(`,"AUTHORITY_RESOURCE":""}`)...)
+			case "subject-null-alias":
+				body = append(body[:len(body)-1], []byte(`,"AUTHORITY_RESOURCE":null}`)...)
+			case "kind-alias":
+				body = []byte(strings.Replace(string(body), `"authority_kind"`, `"AUTHORITY_KIND"`, 1))
+			case "scope-alias":
+				body = []byte(strings.Replace(string(body), `"tenant_id"`, `"TENANT_ID"`, 1))
+			case "duplicate-principal", "duplicate-escaped-principal":
+				principal, _ := json.Marshal(valid.Principal)
+				key := `"principal"`
+				if name == "duplicate-escaped-principal" {
+					key = `"\u0070rincipal"`
+				}
+				body = append(body[:len(body)-1], []byte(`,`+key+`:`+string(principal)+`}`)...)
+			case "duplicate-kind":
+				body = append(body[:len(body)-1], []byte(`,"authority_kind":"subject"}`)...)
+			case "duplicate-native-null":
+				body = append(body[:len(body)-1], []byte(`,"authority_resource":null}`)...)
+			case "duplicate-scope":
+				scope, _ := json.Marshal(valid.Scope)
+				body = append(body[:len(body)-1], []byte(`,"scope":`+string(scope)+`}`)...)
+			case "duplicate-scope-tenant":
+				tenant, _ := json.Marshal(valid.Scope.TenantID)
+				body = []byte(strings.Replace(string(body), `"tenant_id":`+string(tenant), `"tenant_id":"foreign","tenant_id":`+string(tenant), 1))
+			}
 			if name == "unexpected-subject-empty-resource" || name == "empty-native-resource" {
 				body = append(body[:len(body)-1], []byte(`,"authority_resource":""}`)...)
 			}
@@ -128,8 +165,8 @@ func TestWorkloadContextRejectsMismatchedMalformedAndUnavailableResponses(t *tes
 			defer server.Close()
 			client, _ := NewResourceClient(ControlValidatorOptions{BaseURL: server.URL, HTTPClient: server.Client(), SigningKeyID: f.config.SigningKeyID, SigningKey: f.config.SigningKey})
 			got, err := client.WorkloadContext(ctx)
-			if name == "valid-subject" {
-				if err != nil || got != valid {
+			if strings.HasPrefix(name, "valid-") {
+				if err != nil || got != value {
 					t.Fatal(got, err)
 				}
 				return
