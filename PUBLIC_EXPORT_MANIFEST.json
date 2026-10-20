@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "c3d1607fa58bd7680eb6fc304ac98e9de584057a",
+  "source_commit": "c96c746ed53d37f728632c573ba54f61119680b9",
   "files": [
     {
       "path": ".dockerignore",
@@ -337,7 +337,11 @@
     },
     {
       "path": "lotorhttp/function_bindings.go",
-      "sha256": "6df777953c361f5f7ec9deeeaa78ad2c617f1597f5ea757f6119fd49ca80b5dc"
+      "sha256": "61a831e61dbe53a978d73a02afd14be87ef870b204ce07986a849d83f040d8b6"
+    },
+    {
+      "path": "lotorhttp/function_endpoint_test.go",
+      "sha256": "0554b8e83673a72e55bb862f50c457fff2c4ef91a33f318952ec19b1b8fb3c98"
     },
     {
       "path": "lotorhttp/gateway_assertion_test.go",
