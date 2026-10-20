@@ -1,0 +1,7 @@
+# Only connector source enters the builder; never local configuration or keys.
+**
+!go.mod
+!go.sum
+!bridge/**/*.go
+!cmd/lotor-development-connector/main.go
+!cmd/lotor-development-connector/Dockerfile

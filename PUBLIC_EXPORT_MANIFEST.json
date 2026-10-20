@@ -1,8 +1,12 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "f79b1fbf7890ba8d9895180e8d1d26f0a6a7a2e9",
+  "source_commit": "c3d1607fa58bd7680eb6fc304ac98e9de584057a",
   "files": [
+    {
+      "path": ".dockerignore",
+      "sha256": "a88b4aa9d68902e39c315d145c6adde2dc8806a4dce6fd8e93929da6fc34ba6c"
+    },
     {
       "path": ".github/CODEOWNERS",
       "sha256": "af177beb8470030757336b55c0174d8836f98457f8b4341ae8c1a250a179d187"
@@ -18,6 +22,50 @@
     {
       "path": "bridge/client/client.go",
       "sha256": "e63826ba2ad22f5af38e114474eae41516e8066f9da027997a82b77f3eaa2c32"
+    },
+    {
+      "path": "bridge/development/connector_test.go",
+      "sha256": "c80a4259b3f2e2421c7e9f6479310f97a3e81e14bab711b4bf744224b4d5acfe"
+    },
+    {
+      "path": "bridge/development/connector.go",
+      "sha256": "08114b91e77ccff1d0d3041b94779d544553fbdac3287710a8cf27d2b0940219"
+    },
+    {
+      "path": "bridge/development/local_test.go",
+      "sha256": "3d35621e46d0a7fb21f36075b7cf03710619f0ae62cfb126389a59f8b7fcdaaf"
+    },
+    {
+      "path": "bridge/development/local.go",
+      "sha256": "4544d44e0cd97e88fa77e49d8f2a3b40ce6f9db88dd382f9f9b2b99ced0b6bde"
+    },
+    {
+      "path": "bridge/development/proof_test.go",
+      "sha256": "40ff9bf2abf1f1d7b6a3f1d586c4f7652156fe32b056f574f9fd4a53536a0bf9"
+    },
+    {
+      "path": "bridge/development/proof.go",
+      "sha256": "1daec847ecd032a35d05a1917f3123edb99b1db64015a69d778a3981b3f71552"
+    },
+    {
+      "path": "bridge/development/protocol_test.go",
+      "sha256": "daa6ce34f08141df4027de9254ccd1771f24d4f595731972981572318aa68b8d"
+    },
+    {
+      "path": "bridge/development/protocol.go",
+      "sha256": "03f9742c94ab8e5ce7714ae462e125cdb7ae0fda1e3bbf55bbb0154fd42528e3"
+    },
+    {
+      "path": "bridge/development/provider_test.go",
+      "sha256": "57d13470fe4c5c6d54b1a5a42be6412589238b81371c2e691d7ff2128b3069cc"
+    },
+    {
+      "path": "bridge/development/provider.go",
+      "sha256": "0ebd60244a0f3882d499b856ba71d70c86df470b18ad18fcca2b7e798334b576"
+    },
+    {
+      "path": "bridge/development/README.md",
+      "sha256": "f8cb9d4da9c86c4c724fb0140c9b29c567476930fd3de40f6493e2533b772375"
     },
     {
       "path": "bridge/discovery_test.go",
@@ -100,12 +148,28 @@
       "sha256": "36d2743f2da3bfb8cf3c21e9782ecd0d42ec77a50446d5cc96503c9e0bfa644c"
     },
     {
+      "path": "cmd/lotor-development-connector/Dockerfile",
+      "sha256": "79d05dafc3c9f363a3e0b730ca1751c3b980b76420307dedffd15c7a456e5e9e"
+    },
+    {
+      "path": "cmd/lotor-development-connector/main_test.go",
+      "sha256": "03bb867699deb6f807eb5d10a5a0b3f6ba76aebf0faf7f0d94a5f7c2694ee8ff"
+    },
+    {
+      "path": "cmd/lotor-development-connector/main.go",
+      "sha256": "8114d8272abd89b1806792ca34a391c31c089357810749f2c4aba6c23a3834f8"
+    },
+    {
       "path": "examples/basic/main.go",
       "sha256": "3ed6f7ceb6bb862814e3ea4245af32e0a0bdac3c01bbd712e9be3cdde95a8e69"
     },
     {
       "path": "go.mod",
-      "sha256": "5bc653088cd538564d87b62af8e8eaf5a81aabd485c18930aa665f5abdf19893"
+      "sha256": "0a10a47fd0a1ad75834c1ce5350631f613bc895112877a2a2f44d1d8e06267de"
+    },
+    {
+      "path": "go.sum",
+      "sha256": "874a91c5fb043526bc117c0f260c77e4372ab11a28eb6ef2b754fdbb55101f7a"
     },
     {
       "path": "LICENSE",
@@ -262,6 +326,10 @@
     {
       "path": "lotorhttp/control.go",
       "sha256": "7d9d2db3612559352f5e0e0ee12de1250c9ceadf4112e6c01bf5ff2dda34200a"
+    },
+    {
+      "path": "lotorhttp/development_connections.go",
+      "sha256": "772ffcbe11f38f214e4e5374c057ad143faaa125914b5fae733ed88460390235"
     },
     {
       "path": "lotorhttp/function_bindings_test.go",
