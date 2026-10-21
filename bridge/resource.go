@@ -50,8 +50,9 @@ type ResourcePayloadAccessLease struct {
 }
 
 type ResourcePayloadAccess struct {
-	Lease    ResourcePayloadAccessLease `json:"lease"`
-	Manifest ResourcePayloadManifest    `json:"manifest"`
+	CustodyOwner string                     `json:"custody_owner,omitempty"`
+	Lease        ResourcePayloadAccessLease `json:"lease"`
+	Manifest     ResourcePayloadManifest    `json:"manifest"`
 }
 
 // ResourceClient uses the registered runtime's signing identity, not an app
@@ -74,14 +75,18 @@ func (client *ResourceClient) Authorize(ctx context.Context, authorization Autho
 // the stored representation and a short-lived download lease, never a key or an
 // implicitly decrypted object. PayloadVersion must be the exact planned version.
 func (client *ResourceClient) AccessPayload(ctx context.Context, resource, slot string, payloadVersion int64) (ResourcePayloadAccess, error) {
+	return client.accessPayload(ctx, resource, slot, payloadVersion, false)
+}
+
+func (client *ResourceClient) accessPayload(ctx context.Context, resource, slot string, payloadVersion int64, useCustody bool) (ResourcePayloadAccess, error) {
 	authorization, original, ok := InvocationFromContext(ctx)
-	if !ok || !slices.Contains(authorization.Resources, resource) || !slices.Contains(authorization.Capabilities, "payload.read") {
+	if !ok || !slices.Contains(authorization.Resources, resource) || !slices.Contains(authorization.Capabilities, "payload.read") || useCustody && !slices.Contains(authorization.Capabilities, "custody.use") {
 		return ResourcePayloadAccess{}, ErrUnauthorized
 	}
 	if !identifier(resource, 256) || !identifier(slot, 128) || payloadVersion < 1 {
 		return ResourcePayloadAccess{}, ErrInvalid
 	}
-	proof, err := SignResourceAccess(ResourceAccessRequest{Authorization: original, Resource: resource, Slot: slot, PayloadVersion: payloadVersion}, client.validator.keyID, client.validator.key)
+	proof, err := SignResourceAccess(ResourceAccessRequest{Authorization: original, Resource: resource, Slot: slot, PayloadVersion: payloadVersion, UseCustody: useCustody}, client.validator.keyID, client.validator.key)
 	if err != nil {
 		return ResourcePayloadAccess{}, ErrInvalid
 	}

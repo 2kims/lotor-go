@@ -1,0 +1,36 @@
+{
+  "key": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+  "plaintext": "\"private@example.test\"",
+  "value": {
+    "format": "lotor.resource-value.v1",
+    "context": {
+      "binding": {
+        "scope": {
+          "tenant_id": "tenant",
+          "application_id": "application",
+          "environment_id": "sandbox",
+          "owner_resource": "organization:customer"
+        },
+        "client_id": "client",
+        "resource": "resource:one",
+        "slot": "credential",
+        "key_resource": "organization:one",
+        "custody_owner": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "key_version": 2,
+        "resource_revision": 3,
+        "lifecycle_generation": 1,
+        "payload_version": 4,
+        "object_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "invocation_id": "invocation-one",
+        "binding_id": "binding-one",
+        "binding_revision": 1,
+        "principal": "user:one",
+        "policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expires_at": 1792540800
+      },
+      "path": "users.email"
+    },
+    "nonce": "CAgICAgICAgICAgI",
+    "ciphertext": "HjAs94FakpieWwwckQWk45lyIo_Z51u8LeFYGUpbWBziat0BzQM"
+  }
+}
