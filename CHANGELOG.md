@@ -6,6 +6,11 @@ are called out explicitly.
 
 ## Unreleased
 
+- Add callback-scoped resource custody composition for approved function runtimes,
+  current custody-owner identity, encrypted payload opening, and authenticated
+  resource values with recipient-side Go/browser interoperability. No key-export
+  endpoint or application/provider implementation is included.
+
 - Add generic resource-event stream configuration, append, snapshot queries,
   pagination, histograms and body reads. Native resource credentials can append
   only to an explicitly enabled stream on their exact owning resource.

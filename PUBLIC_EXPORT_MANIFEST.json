@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "c3d1607fa58bd7680eb6fc304ac98e9de584057a",
+  "source_commit": "45962b5fcd2b8619e5c99df9b6fe85c4b639d051",
   "files": [
     {
       "path": ".dockerignore",
@@ -22,6 +22,18 @@
     {
       "path": "bridge/client/client.go",
       "sha256": "e63826ba2ad22f5af38e114474eae41516e8066f9da027997a82b77f3eaa2c32"
+    },
+    {
+      "path": "bridge/custody_access_test.go",
+      "sha256": "f6df9d4fff6a6b4d7fb4289b80bf8ccd9fa5eae12d21c83045fccb720b4f247b"
+    },
+    {
+      "path": "bridge/custody_test.go",
+      "sha256": "2a7c1d4ceef1bf6af929b5883eadda625831d9984740092ca1a13dc21a50eb01"
+    },
+    {
+      "path": "bridge/custody.go",
+      "sha256": "692dd8e863abbef7cb28716244dc340294eb688bbe7a171ecd847ee35b32e304"
     },
     {
       "path": "bridge/development/connector_test.go",
@@ -93,7 +105,7 @@
     },
     {
       "path": "bridge/protocol.go",
-      "sha256": "e37fae135e24a7ad23ea6b00675a4c8ba850a2b13d47aa41f8152dc96a77b6f9"
+      "sha256": "35e01c3d0c269b12f32c3dcb4faf111d6d59d8502af9146ef54a97ac66fcfcea"
     },
     {
       "path": "bridge/resource_test.go",
@@ -101,7 +113,7 @@
     },
     {
       "path": "bridge/resource.go",
-      "sha256": "fd452802685870a3984708feb6cd6898b202061bbf18bbaa9f0756c0c583f631"
+      "sha256": "cb1f8746d72111d4b9b1d1e00ba985e2ff9304143a8d963190168acb1efb6767"
     },
     {
       "path": "bridge/runtime_test.go",
@@ -114,6 +126,10 @@
     {
       "path": "bridge/sqlstore/postgres.go",
       "sha256": "85b8b19d6b7906455c0cc03092f9921c9bcea9c86b2e8d541df8c1ff9f291251"
+    },
+    {
+      "path": "bridge/testdata/resource-value-v1.json",
+      "sha256": "0a3212d35b8aa64a7e9c05c101fd3d361258730b2c3640a16210aaf6ab1806f7"
     },
     {
       "path": "bridge/transport/https_test.go",
@@ -145,7 +161,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "36d2743f2da3bfb8cf3c21e9782ecd0d42ec77a50446d5cc96503c9e0bfa644c"
+      "sha256": "55d68ce9f8a393013737f8c1ac68ad60195c0c48666f1d28c896cca4c253b736"
     },
     {
       "path": "cmd/lotor-development-connector/Dockerfile",
@@ -337,7 +353,11 @@
     },
     {
       "path": "lotorhttp/function_bindings.go",
-      "sha256": "6df777953c361f5f7ec9deeeaa78ad2c617f1597f5ea757f6119fd49ca80b5dc"
+      "sha256": "61a831e61dbe53a978d73a02afd14be87ef870b204ce07986a849d83f040d8b6"
+    },
+    {
+      "path": "lotorhttp/function_endpoint_test.go",
+      "sha256": "0554b8e83673a72e55bb862f50c457fff2c4ef91a33f318952ec19b1b8fb3c98"
     },
     {
       "path": "lotorhttp/gateway_assertion_test.go",

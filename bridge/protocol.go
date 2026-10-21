@@ -71,6 +71,7 @@ type ResourceAccessRequest struct {
 	Resource       string        `json:"resource"`
 	Slot           string        `json:"slot"`
 	PayloadVersion int64         `json:"payload_version"`
+	UseCustody     bool          `json:"use_custody,omitempty"`
 }
 
 func SignResourceAccess(value ResourceAccessRequest, keyID string, key ed25519.PrivateKey) (SignedMessage, error) {

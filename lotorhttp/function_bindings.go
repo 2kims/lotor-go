@@ -159,6 +159,17 @@ func (c *ControlClient) FunctionBinding(ctx context.Context, resource, bindingID
 	return out, err
 }
 
+// UpdateFunctionBindingEndpoint preserves the binding/key and invocation
+// identity. A changed endpoint must pass normal ownership verification again.
+func (c *ControlClient) UpdateFunctionBindingEndpoint(ctx context.Context, resource, bindingID, endpoint string, expectedRevision int64) (FunctionBinding, error) {
+	var out FunctionBinding
+	err := c.request(ctx, http.MethodPut, functionBindingPath(resource)+"/"+url.PathEscape(requiredControl(bindingID, "binding ID"))+"/endpoint", "", struct {
+		EndpointURL      string `json:"endpoint_url"`
+		ExpectedRevision int64  `json:"expected_revision"`
+	}{endpoint, expectedRevision}, &out)
+	return out, err
+}
+
 // VerifyFunctionBinding queues verification. Inspect FunctionBinding for its
 // eventual outcome; an accepted request does not mean the binding is ready.
 func (c *ControlClient) VerifyFunctionBinding(ctx context.Context, resource, bindingID string) (FunctionBinding, error) {
