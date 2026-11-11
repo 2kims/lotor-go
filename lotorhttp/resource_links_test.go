@@ -40,7 +40,9 @@ func TestControlResourceGraphWorkflow(t *testing.T) {
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"candidates": []any{map[string]any{"kind": "service_account", "resource": "service_account:deploy", "display_name": "Deploy", "link_state": "available", "selectable": true}}, "next_cursor": nil})
 		case r.URL.Path == "/v1/public/applications/app/resources/vault:one/links/preflight":
-			w.Header().Set("Lotor-Link-Token", "link-token")
+			if !denied {
+				w.Header().Set("Lotor-Link-Token", "link-token")
+			}
 			_ = json.NewEncoder(w).Encode(graphLinkResult("ready", !denied))
 		case r.URL.Path == "/v1/public/applications/app/resources/vault:one/links/commit":
 			if r.Header.Get("Lotor-Link-Token") != "link-token" {
@@ -215,6 +217,54 @@ func TestControlResourceSubjectAccessCheckRejectsMalformedResponse(t *testing.T)
 	response = map[string]any{"resource": "vault:one", "subject": "user:alice", "allowed": true, "relations": []string{"owner"}}
 	if _, err = app.CheckResourceSubjectAccess(t.Context(), "vault:one", "user:alice"); err == nil {
 		t.Fatal("accepted undisclosed response field")
+	}
+}
+
+func TestControlResourceLinkPreflightReturnsRefusalReason(t *testing.T) {
+	refused := graphLinkResult("failed", false)
+	refused["failure_reason"] = "recipient_key_missing"
+	refused["outcomes"] = []any{map[string]any{"resource": "vault:one", "subject": "user:bot", "relation": "member", "state": "denied", "allowed": false, "reason": "recipient_key_missing"}}
+	includeToken := false
+	commits := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/links/commit") {
+			commits++
+		}
+		if includeToken {
+			w.Header().Set("Lotor-Link-Token", "link-token")
+		}
+		_ = json.NewEncoder(w).Encode(refused)
+	}))
+	defer server.Close()
+	app, err := NewControlClient(ControlClientOptions{BaseURL: server.URL, ClientID: "app", SecretKey: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := app.ForUser("alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	changes := []ResourceLinkChange{{Action: "grant", Relation: "member", Subject: "user:bot", Provisioning: "existing_only", Delivery: "none"}}
+
+	preflight, err := client.PreflightResourceLinks(t.Context(), "vault:one", changes)
+	if err != nil || preflight.Token != "" || preflight.Result.Committable || preflight.Result.FailureReason != "recipient_key_missing" {
+		t.Fatalf("preflight=%+v err=%v", preflight, err)
+	}
+	if _, err = client.CommitResourceLinks(t.Context(), "vault:one", preflight, nil); err == nil {
+		t.Fatal("committed a refused preflight")
+	}
+	_, err = client.SendResourceLinks(t.Context(), "vault:one", ResourceLinkSendInput{Changes: changes})
+	var controlErr *ControlError
+	if !errors.As(err, &controlErr) || controlErr.Status != http.StatusConflict || controlErr.Code != "recipient_key_missing" {
+		t.Fatalf("send err=%v", err)
+	}
+	if commits != 0 {
+		t.Fatalf("commits=%d", commits)
+	}
+
+	includeToken = true
+	if _, err = client.PreflightResourceLinks(t.Context(), "vault:one", changes); err == nil {
+		t.Fatal("accepted a token for a refused change")
 	}
 }
 

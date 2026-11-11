@@ -156,6 +156,9 @@ type ResourceLinkResult struct {
 	Idempotent        bool                           `json:"idempotent"`
 }
 
+// ResourceLinkPreflight is Lotor's answer to a proposed link change. Token is
+// set only when Result.Committable is true; a refused change carries its
+// reason in Result.FailureReason and per-change Result.Outcomes.
 type ResourceLinkPreflight struct {
 	Token  string
 	Result ResourceLinkResult
@@ -340,12 +343,20 @@ func (c *ControlClient) PreflightResourceLinks(ctx context.Context, resource str
 	if err != nil {
 		return ResourceLinkPreflight{}, err
 	}
-	token := strings.TrimSpace(headers.Get("Lotor-Link-Token"))
-	if token, err = graphString(token, "link token", 512); err != nil {
-		return ResourceLinkPreflight{}, errors.New("Lotor link preflight response is missing its token")
-	}
 	if err = validateResourceLinkResult(out, resource); err != nil {
 		return ResourceLinkPreflight{}, err
+	}
+	token := strings.TrimSpace(headers.Get("Lotor-Link-Token"))
+	// Lotor issues a commit token only for a committable change. A refused
+	// preflight is a valid answer: return it so callers can read its reason.
+	if !out.Committable {
+		if token != "" {
+			return ResourceLinkPreflight{}, errors.New("Lotor link preflight returned a token for a change it refused")
+		}
+		return ResourceLinkPreflight{Result: out}, nil
+	}
+	if token, err = graphString(token, "link token", 512); err != nil {
+		return ResourceLinkPreflight{}, errors.New("Lotor link preflight response is missing its token")
 	}
 	return ResourceLinkPreflight{Result: out, Token: token}, nil
 }

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "target": "go",
-  "source_commit": "45962b5fcd2b8619e5c99df9b6fe85c4b639d051",
+  "source_commit": "5262825b1b896b6450a69b3c3bb5d228aa3e93fd",
   "files": [
     {
       "path": ".dockerignore",
@@ -161,7 +161,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "55d68ce9f8a393013737f8c1ac68ad60195c0c48666f1d28c896cca4c253b736"
+      "sha256": "b0faefe66b58eb36c6cb76eff9cdabd947a52c9f3767312b15e0a84810a97dfa"
     },
     {
       "path": "cmd/lotor-development-connector/Dockerfile",
@@ -401,11 +401,11 @@
     },
     {
       "path": "lotorhttp/resource_links_test.go",
-      "sha256": "3beb3cbb3fa9553cba864dc690e665df928bc0cb290356afb023b49eaefda69a"
+      "sha256": "daa6661952a77ff68ae581fdfca83d22477a9065a54082e6de6f9eebaf2d7572"
     },
     {
       "path": "lotorhttp/resource_links.go",
-      "sha256": "d5287d8edc276511905cf81c1f83d1ba78fff261e37bfacd4f3d7d5ee8de1ae5"
+      "sha256": "1ffb839a17fb4bf895af6f76fa729841eb1059ee1aa7bc28cd3fe81af92eb993"
     },
     {
       "path": "lotorhttp/resource_node_interop_test.go",
