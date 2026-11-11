@@ -6,6 +6,13 @@ are called out explicitly.
 
 ## Unreleased
 
+- Return a refused resource-link preflight instead of failing with "missing its
+  token". Lotor issues a commit token only for a committable change, so
+  `PreflightResourceLinks` now returns the result with an empty token and its
+  `FailureReason`, and `SendResourceLinks` reports that reason (for example
+  `recipient_key_missing`) as a 409 `ControlError`. A token on a refused
+  change is rejected. The TypeScript SDK gets the same fix.
+
 - Add callback-scoped resource custody composition for approved function runtimes,
   current custody-owner identity, encrypted payload opening, and authenticated
   resource values with recipient-side Go/browser interoperability. No key-export
